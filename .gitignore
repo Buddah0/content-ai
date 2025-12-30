@@ -1,0 +1,70 @@
+# Python virtualenvs
+.venv/
+venv/
+env/
+
+# Bytecode, caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# IDEs / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+tmp/
+temp/
+cache/
+.cache/
+
+# Output and renders (ignore heavy media exports and intermediates)
+output/
+exports/
+renders/
+montage/
+clips/
+
+# Intermediates
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.npy
+*.npz
+
+# Large media (don't commit raw video by default)
+*.mp4
+*.mkv
+*.mov
+*.avi
+
+# But allow tracking sample assets under /samples/ or /sample_data/ (negations)
+!samples/
+!samples/**
+!sample_data/
+!sample_data/**
+
+# Personal/local config overrides (will be ignored)
+config/local.yaml
+config/*.local.yaml
+
+# Keep default config tracked
+!config/default.yaml
+
+# Temporary audio file used by scripts
+temp_audio.wav
+
+# End of .gitignore
