@@ -3,7 +3,7 @@ AI gameplay highlight detector + montage builder
 Content AI — style-aware editing for gameplay highlights.
 
 Project Status
-- Local repo; not yet published to GitHub. Basic engine exists for detecting percussive "hype" moments and stitching them into a montage. Next milestone: folder scanning (batch processing) and a CLI.
+- Next milestone: folder scanning (batch processing) and a CLI.
 
 What it does (Current)
 - Uses HPSS via librosa to separate harmonic (voice/music) and percussive (shots/explosions) elements.
