@@ -1,34 +1,17 @@
-defaults_version: "v1"
-
-# Input / output
-input_dir: "./input"
-output_dir: "./output"
-recursive: false
-extensions:
-  - ".mp4"
-  - ".mkv"
-  - ".mov"
-  - ".avi"
-
-# Audio processing params
-audio_params:
-  hpss_enabled: true
-
-# Detection parameters
-detection_params:
+# Detection Parameters
+detection:
   rms_threshold: 0.10
   min_event_duration_s: 0.1
+  hpss_margin: [1.0, 5.0]  # harmonic, percussive margins
 
-# Edit post-processing
-edit_params:
+# Processing Parameters
+processing:
   context_padding_s: 1.0
   merge_gap_s: 2.0
-
-# Run-time params
-run_params:
-  dry_run: false
-  limit: null
-
-# Style-related params (planned)
-style_params:
-  style_profile_path: null
+  
+# Output Defaults
+output:
+  max_duration_s: 90
+  max_segments: 12
+  order: "chronological" # chronological, score, hybrid
+  keep_temp: false

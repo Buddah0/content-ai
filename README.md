@@ -1,112 +1,98 @@
-AI gameplay highlight detector + montage builder
+# Content AI
 
-Content AI — style-aware editing for gameplay highlights.
+**Content AI** is an intelligent engine that automatically turns raw gameplay footage into rhythmic "hype montages." It uses audio signal processing to detect percussive events (gunshots, explosions, critical hits) and stitches them together into a high-energy reel.
 
-Project Status
-- Next milestone: folder scanning (batch processing) and a CLI.
+## ✨ Key Features
 
-What it does (Current)
-- Uses HPSS via librosa to separate harmonic (voice/music) and percussive (shots/explosions) elements.
-- Calculates RMS on the percussive layer to detect events.
-- Smart edit logic (thresholding, micro-burst detection, padding, merging/bridging) implemented in `make_reel.py`.
-- Video export via moviepy.
+- **Automated Hype Detection**: Uses `librosa` HPSS (Harmonic-Percussive Source Separation) to isolate combat sounds from background music/voice.
+- **Batch Processing**: Scan entire folders recursively to generate montages from multiple source files.
+- **Smart Merging**: Intelligently merges close-together clips to preserve flow and context.
+- **Robust Rendering**: Safely handles video I/O with process isolation and `ffmpeg` concatenation.
+- **Configurable**: Fully customizable via CLI flags or YAML configuration files.
 
-Style Replication Vision (Planned)
-- Learn editing patterns (pacing, cut density, padding, merge gaps, ranking) from pairs of (RAW gameplay, FINAL montage).
-- Option 1 inputs: a pair of (raw gameplay video, final edited montage).
-- Planned pipeline (high level):
-  - detect cuts in the final montage (cut_detector) — Planned
-  - align montage segments back to raw timeline (aligner) — Planned
-  - extract style features and save a `style_profile` (JSON) — Planned
-  - apply `style_profile` to future reels via `style_applier` — Planned
+## 🚀 Quickstart
 
-Quickstart
-1) Create a virtualenv and activate it:
+### 1. Installation
+
+Requires **Python 3.11+**.
 
 ```bash
-python3.11 -m venv venv
+# Create and activate a virtual environment
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
 source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-2) Install dependencies (minimum):
-
+### 2. Verify Setup
+Ensure dependencies (including `ffmpeg`) are correctly detected:
 ```bash
-pip install numpy librosa moviepy
-# You will also need ffmpeg installed on your system for moviepy to write video files.
+python -m content_ai check
 ```
 
-3) Run the simple demo entrypoints (existing scripts):
+### 3. Usage
 
+#### Batch Scan (Recommended)
+Scan a folder (and subfolders) for video files and generate a montage.
 ```bash
-python make_reel.py            # produces hype_reel.mp4 from my_gameplay.mp4 (default)
-python find_hype.py           # prints detected percussive segments
-python find_hype_strict.py    # prints volume report / percussive peaks
+python -m content_ai scan --input ./raw_videos --recursive
 ```
 
-Folder Scanning (Next Milestone) — Planned
-- Two modes (planned):
-  1) CLI batch mode: scan a folder (optional recursive), filter by extensions, write run-based outputs.
-  2) Config-driven mode: use [config/default.yaml](config/default.yaml) as defaults, allow `--config` to override.
-- Precedence: CLI flags will override config values.
-- Example (planned):
-
+#### Single File
 ```bash
-# CLI batch (planned)
-content-ai scan --input ./raw_videos --output ./output --recursive --limit 10
-
-# Config-driven (planned)
-content-ai run --config config/default.yaml
+python -m content_ai scan --input my_gameplay.mp4
 ```
 
-Run-based output structure
-- Each run produces `output/run_###/` containing:
-  - `montage.mp4` (final video)
-  - `segments.json` (detected segments) — if generated
-  - `run_meta.json` (DIFF-ONLY metadata with `defaults_version` and overrides)
-
-Configuration / Defaults
-- The authoritative defaults live in [config/default.yaml](config/default.yaml).
-- Key defaults:
-  - `rms_threshold`: 0.10
-  - `min_event_duration_s`: 0.1
-  - `context_padding_s`: 1.0
-  - `merge_gap_s`: 2.0
-- Per-user overrides should be placed in `config/local.yaml` (planned) and will be ignored by git.
-
-Outputs / Artifacts
-- Exports go to `output/` by default (see config for overrides).
-- Intermediate artifacts (extracted audio, .wav files, .npy arrays) are produced into `output/run_###/` or temporary files like `temp_audio.wav`.
-
-Repo Structure (current)
-```
-find_hype.py           # utility: detect percussive hype moments (uses librosa)
-find_hype_strict.py    # stricter analysis & volume report
-make_reel.py           # main quick demo that writes hype_reel.mp4
-my_gameplay.mp4        # sample gameplay file (local)
-hype_reel.mp4          # sample output (local)
-temp_audio.wav         # temp audio extracted by scripts
-venv/                  # local virtualenv (ignored by git)
-```
-
-Git + Branching (local)
+#### Legacy Mode
+The original script is preserved as a wrapper around the new engine:
 ```bash
-git init
-git add .
-git commit -m "chore: initial local repo"
-git branch -M main
-
-# Recommended feature branches
-git checkout -b feat/folder-scan
-git checkout -b feat/style-profile
-git checkout -b chore/docs
+python make_reel.py my_gameplay.mp4
 ```
 
-Roadmap (realistic)
-- Folder scanning + batch processing (CLI + config)
-- Adaptive thresholding (median + MAD)
-- Audio normalization and multi-feature fusion
-- Cooldown / debounce logic to avoid overcutting
-- OCR killfeed confirmation (experimental)
-- Style learning pipeline (Option 1)
+## ⚙️ Configuration
 
-If something above is labeled "Planned", it is not yet implemented — see the roadmap and ARCHITECTURE.md for details.
+Defaults are defined in `config/default.yaml`. You can override them using CLI arguments.
+
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `--rms-threshold` | Volume threshold for event detection | `0.10` |
+| `--merge-gap` | Merge segments closer than this (seconds) | `2.0` |
+| `--padding` | Padding around each event (seconds) | `1.0` |
+| `--max-duration` | Max length of final montage | `90s` |
+| `--order` | Sorting strategy (`chronological`, `score`, `hybrid`) | `chronological` |
+
+## 📂 Project Structure
+
+```
+content-ai/
+├── content_ai/          # Core Package
+│   ├── cli.py           # Command-line interface
+│   ├── config.py        # Config loader
+│   ├── detector.py      # Audio analysis logic
+│   ├── pipeline.py      # Orchestrator
+│   ├── renderer.py      # Video rendering (ffmpeg/moviepy)
+│   ├── scanner.py       # File discovery
+│   └── segments.py      # Pure logic (merging/clamping)
+├── config/
+│   └── default.yaml     # Authoritative defaults
+├── output/              # Generated runs (run_001, run_002...)
+├── tests/               # Unit tests
+├── make_reel.py         # Legacy wrapper
+└── requirements.txt     # Dependencies
+```
+
+## 🛠️ Development
+
+Run tests:
+```bash
+python -m pytest tests/
+```
+
+## ⚠️ Requirements
+- **FFmpeg**: Must be available on your system.
+  - On Windows/WSL, the tool attempts to use `imageio-ffmpeg` automatically if the system `ffmpeg` is missing.
+- **MoviePy 2.x**: This project uses the latest MoviePy v2 API.
