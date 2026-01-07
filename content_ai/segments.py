@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Dict, Any
 
 Segment = Dict[str, Any]  # Dictionary containing at least 'start', 'end'
 
