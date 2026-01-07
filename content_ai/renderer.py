@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 from typing import List, Dict, Any
 import imageio_ffmpeg
 

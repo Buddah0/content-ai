@@ -6,8 +6,9 @@ detection:
 
 # Processing Parameters
 processing:
-  context_padding_s: 1.0
-  merge_gap_s: 2.0
+  context_padding_s: 1.0  # Pre/post-roll padding around each event
+  merge_gap_s: 2.0        # Max gap to merge adjacent segments
+  max_segment_duration_s: 10.0  # Max duration for any single merged segment
   
 # Output Defaults
 output:

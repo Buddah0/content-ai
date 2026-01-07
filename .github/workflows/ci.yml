@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, Smart-Merging ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+
+    - name: Verify FFmpeg installation
+      run: |
+        ffmpeg -version || echo "FFmpeg not found, but continuing..."
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --cov=content_ai --cov-report=term-missing
+
+    - name: Test CLI check command
+      run: |
+        python -m content_ai check
+
+    - name: Verify demo mode (dry run check)
+      run: |
+        # Just verify the CLI accepts the --demo flag
+        python -m content_ai scan --help | grep -q "demo" || exit 1
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort flake8
+
+    - name: Check code formatting with black
+      run: |
+        black --check content_ai/ tests/ || echo "Black formatting check failed (non-blocking)"
+      continue-on-error: true
+
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only content_ai/ tests/ || echo "isort check failed (non-blocking)"
+      continue-on-error: true

@@ -11,6 +11,7 @@ from . import scanner
 from . import detector
 from . import segments as seg_lib
 from . import renderer
+from . import demo as demo_lib
 
 
 def get_run_dir(output_base: str) -> Path:
@@ -34,13 +35,36 @@ def run_scan(cli_args: Dict[str, Any]):
     # 1. Config
     conf = config_lib.resolve_config(cli_args)
 
+    # Handle demo mode
+    is_demo = cli_args.get("demo", False)
+    if is_demo:
+        print("--- 🎬 DEMO MODE ---")
+        demo_asset = demo_lib.get_demo_asset_path()
+        cli_args["input"] = str(demo_asset)
+        # Force specific output for demo
+        cli_args["output"] = "."
+        print(f"Using demo asset: {demo_asset}")
+
     # 2. Output Setup
     output_base = cli_args.get("output", "output")
-    run_dir = get_run_dir(output_base)
+
+    # For demo mode, output directly to demo_output.mp4
+    if is_demo:
+        demo_output_path = Path("demo_output.mp4")
+        print(f"Demo output will be saved to: {demo_output_path.absolute()}")
+    else:
+        demo_output_path = None
+
+    run_dir = get_run_dir(output_base) if not is_demo else Path("output") / "demo_run"
+    if is_demo:
+        run_dir.mkdir(parents=True, exist_ok=True)
+
     print(f"--- 🚀 Starting Run in {run_dir} ---")
 
     # 3. Scan
-    input_path = cli_args.get("input", ".")
+    input_path = cli_args.get("input")
+    if not input_path:
+        input_path = "."
     recursive = cli_args.get("recursive", False)
     limit = cli_args.get("limit", None)
     exts = cli_args.get("ext", None)
@@ -63,6 +87,7 @@ def run_scan(cli_args: Dict[str, Any]):
     # Params
     pad_s = conf["processing"]["context_padding_s"]
     merge_s = conf["processing"]["merge_gap_s"]
+    max_seg_dur = conf["processing"].get("max_segment_duration_s", None)
     min_dur = conf["detection"]["min_event_duration_s"]
 
     for v_path in video_files:
@@ -83,8 +108,8 @@ def run_scan(cli_args: Dict[str, Any]):
             curr_dur = raw[0]["video_duration"]
             clamped = seg_lib.clamp_segments(padded, 0.0, curr_dur)
 
-            # 3. Merge
-            merged = seg_lib.merge_segments(clamped, merge_s)
+            # 3. Merge with max duration enforcement
+            merged = seg_lib.merge_segments(clamped, merge_s, max_seg_dur)
 
             # 4. Filter Min Duration (This is usually applied on RAW events in make_reel,
             # but applying it after merge ensures meaningful clips.
@@ -167,7 +192,7 @@ def run_scan(cli_args: Dict[str, Any]):
     print(f"Selected {len(final_segments)} segments (Total {total_dur:.2f}s).")
 
     # 7. Render
-    montage_path = run_dir / "montage.mp4"
+    montage_path = demo_output_path if is_demo else (run_dir / "montage.mp4")
     if final_segments:
         temp_paths = []
         try:
@@ -220,6 +245,26 @@ def run_scan(cli_args: Dict[str, Any]):
     }
     with open(run_dir / "run_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
+
+    # 9. Print Run Summary (especially for demo mode)
+    print("\n" + "=" * 60)
+    print("RUN SUMMARY")
+    print("=" * 60)
+    print(f"Files scanned:        {len(video_files)}")
+    print(f"Events detected:      {len(all_segments)}")
+    print(f"Segments selected:    {len(final_segments)}")
+    print(f"Total duration:       {total_dur:.2f}s")
+    if final_segments:
+        print(f"Output path:          {montage_path.absolute()}")
+    print("=" * 60)
+
+    if is_demo:
+        print("\n✅ Demo complete! Check demo_output.mp4")
+        if final_segments:
+            return 0  # Exit code 0 for success
+        else:
+            print("⚠️ Warning: No segments were detected in demo.")
+            return 1
 
     print("Run Complete.")
     return run_dir
