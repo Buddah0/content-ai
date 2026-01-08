@@ -1,5 +1,7 @@
 numpy
 librosa
-moviepy>=2.0.0
+moviepy==1.0.3
+imageio-ffmpeg
+decorator
 PyYAML
 pytest
