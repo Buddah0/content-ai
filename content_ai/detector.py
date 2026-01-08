@@ -1,7 +1,7 @@
 import librosa
 import numpy as np
 import os
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 from typing import List, Dict, Any, Tuple
 from pathlib import Path
 

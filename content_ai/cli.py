@@ -15,7 +15,10 @@ def main():
         "scan", help="Scan files/folders and create montage"
     )
     scan_parser.add_argument(
-        "--input", "-i", type=str, default=".", help="Input file or folder"
+        "--input", "-i", type=str, help="Input file or folder"
+    )
+    scan_parser.add_argument(
+        "--demo", action="store_true", help="Run demo mode with bundled sample"
     )
     scan_parser.add_argument(
         "--output", "-o", type=str, default="output", help="Output directory"

@@ -19,10 +19,48 @@
   - `python -m content_ai scan --input ...`
 - Tests: starter coverage exists (light unit tests under `tests/`)
 
-### 🚧 In Progress
-- Smart Merging (WIP): feature is under active development/tuning; behavior may change
+### 🚧 Recent Updates
 
-### 🧪 Quick Demo (Golden Path)
+- **Smart Merging**: ✅ Completed - Intelligent segment merging with max_duration enforcement and deterministic tie-breaking
+- **One-Command Demo**: ✅ Added `--demo` flag for zero-friction pipeline validation
+
+### 🧪 Quick Demo (One-Command Promise)
+
+**Zero-friction validation** that the entire pipeline works end-to-end:
+
+```bash
+python -m content_ai scan --demo
+```
+
+This command:
+
+- Uses a bundled synthetic demo video (auto-generated on first run)
+- Detects percussive events using audio-first HPSS analysis
+- Applies Smart Merging with configurable parameters
+- Outputs `demo_output.mp4` in the repo root
+- Prints a detailed run summary with files scanned, events detected, and segments selected
+- Exits with code 0 on success
+
+**Expected output:**
+
+```text
+--- 🎬 DEMO MODE ---
+Using demo asset: /path/to/assets/demo/sample.mp4
+...
+RUN SUMMARY
+============================================================
+Files scanned:        1
+Events detected:      X
+Segments selected:    Y
+Total duration:       Z.XXs
+Output path:          /path/to/demo_output.mp4
+============================================================
+
+✅ Demo complete! Check demo_output.mp4
+```
+
+### 🧪 Standard Usage (Golden Path)
+
 1) venv + install deps
 
 ```bash
