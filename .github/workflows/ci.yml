@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, Smart-Merging ]
+    branches: [ main, develop, Library-Migration ]
   pull_request:
     branches: [ main, develop ]
 
@@ -23,6 +23,19 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Cache Poetry dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pypoetry
+        key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-poetry-
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -32,24 +45,22 @@ jobs:
       run: |
         ffmpeg -version || echo "FFmpeg not found, but continuing..."
 
-    - name: Install Python dependencies
+    - name: Install dependencies with Poetry
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
+        poetry install --with dev
 
     - name: Run tests
       run: |
-        python -m pytest tests/ -v --cov=content_ai --cov-report=term-missing
+        poetry run pytest
 
     - name: Test CLI check command
       run: |
-        python -m content_ai check
+        poetry run content-ai check
 
-    - name: Verify demo mode (dry run check)
+    - name: Verify CLI help works
       run: |
-        # Just verify the CLI accepts the --demo flag
-        python -m content_ai scan --help | grep -q "demo" || exit 1
+        poetry run content-ai --help
+        poetry run content-ai scan --help
 
   lint:
     runs-on: ubuntu-latest
@@ -63,17 +74,24 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Install linting tools
+    - name: Install Poetry
       run: |
-        python -m pip install --upgrade pip
-        pip install black isort flake8
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    - name: Check code formatting with black
-      run: |
-        black --check content_ai/ tests/ || echo "Black formatting check failed (non-blocking)"
-      continue-on-error: true
+    - name: Cache Poetry dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pypoetry
+        key: ${{ runner.os }}-poetry-lint-${{ hashFiles('**/poetry.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-poetry-lint-
 
-    - name: Check import sorting with isort
+    - name: Install dependencies
       run: |
-        isort --check-only content_ai/ tests/ || echo "isort check failed (non-blocking)"
+        poetry install --with dev
+
+    - name: Run ruff check
+      run: |
+        poetry run ruff check src/ tests/ || echo "Ruff check failed (non-blocking)"
       continue-on-error: true
