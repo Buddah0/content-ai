@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "content-ai"
+version = "0.2.0"
+description = "AI-powered gameplay highlight detector and montage generator"
+authors = ["Buddah <buddah@example.com>"]
+readme = "README.md"
+license = "MIT"
+packages = [{include = "content_ai", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+numpy = "^1.26.0"
+librosa = "^0.10.0"
+moviepy = "1.0.3"
+imageio-ffmpeg = "^0.5.0"
+decorator = ">=4.0.2,<5.0"
+pyyaml = "^6.0"
+pydantic = "^2.10.0"
+pydantic-settings = "^2.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-cov = "^6.0.0"
+ruff = "^0.8.0"
+
+[tool.poetry.scripts]
+content-ai = "content_ai.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --cov=content_ai --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

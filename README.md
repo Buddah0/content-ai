@@ -29,6 +29,10 @@
 **Zero-friction validation** that the entire pipeline works end-to-end:
 
 ```bash
+# With Poetry (recommended)
+poetry run content-ai scan --demo
+
+# Or with pip
 python -m content_ai scan --demo
 ```
 
@@ -61,7 +65,29 @@ Output path:          /path/to/demo_output.mp4
 
 ### 🧪 Standard Usage (Golden Path)
 
-1) venv + install deps
+#### Using Poetry (Recommended)
+
+1) Install Poetry if not already installed
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+2) Install dependencies
+
+```bash
+poetry install
+```
+
+3) Verify environment
+
+```bash
+poetry run content-ai check
+```
+
+#### Using pip (Alternative)
+
+1) Create virtual environment + install deps
 
 ```bash
 python -m venv venv
@@ -78,19 +104,31 @@ pip install -r requirements.txt
 python -m content_ai check
 ```
 
-3) Batch scan example (recommended)
+**Note:** Poetry is the source of truth for dependencies. `requirements.txt` is auto-generated via `poetry export` for pip compatibility.
+
+#### Running Commands
+
+**Batch scan** (recommended)
 
 ```bash
+# With Poetry
+poetry run content-ai scan --input ./raw_videos --recursive
+
+# With pip
 python -m content_ai scan --input ./raw_videos --recursive
 ```
 
-4) Single file example
+**Single file**
 
 ```bash
+# With Poetry
+poetry run content-ai scan --input my_gameplay.mp4
+
+# With pip
 python -m content_ai scan --input my_gameplay.mp4
 ```
 
-5) Legacy mode (wrapper preserved)
+**Legacy mode** (wrapper preserved)
 
 ```bash
 python make_reel.py my_gameplay.mp4
@@ -197,27 +235,77 @@ Defaults are defined in `config/default.yaml`. You can override them using CLI a
 
 ```
 content-ai/
-├── content_ai/          # Core Package
-│   ├── cli.py           # Command-line interface
-│   ├── config.py        # Config loader
-│   ├── detector.py      # Audio analysis logic
-│   ├── pipeline.py      # Orchestrator
-│   ├── renderer.py      # Video rendering (ffmpeg/moviepy)
-│   ├── scanner.py       # File discovery
-│   └── segments.py      # Pure logic (merging/clamping)
+├── src/
+│   └── content_ai/          # Core Package (src layout)
+│       ├── cli.py           # Command-line interface
+│       ├── config.py        # Config loader with Pydantic
+│       ├── models.py        # Pydantic data models
+│       ├── detector.py      # Audio analysis logic
+│       ├── pipeline.py      # Orchestrator
+│       ├── renderer.py      # Video rendering (ffmpeg/moviepy)
+│       ├── scanner.py       # File discovery
+│       └── segments.py      # Pure logic (merging/clamping)
+├── tests/                   # Comprehensive test suite (60+ tests)
+│   ├── test_config.py       # Config loading & Pydantic validation
+│   ├── test_models.py       # Pydantic model validation
+│   ├── test_scanner.py      # File scanning & batch processing
+│   ├── test_cli.py          # CLI smoke tests
+│   └── test_segments.py     # Segment merging logic
 ├── config/
-│   └── default.yaml     # Authoritative defaults
-├── output/              # Generated runs (run_001, run_002...)
-├── tests/               # Unit tests
-├── make_reel.py         # Legacy wrapper
-└── requirements.txt     # Dependencies
+│   └── default.yaml         # Authoritative defaults
+├── output/                  # Generated runs (run_001, run_002...)
+├── pyproject.toml           # Poetry configuration (source of truth)
+├── poetry.lock              # Locked dependencies
+├── requirements.txt         # Generated from Poetry (pip fallback)
+└── make_reel.py             # Legacy wrapper
 ```
 
 ## 🛠️ Development
 
-Run tests:
+### Setup
+
 ```bash
-python -m pytest tests/
+# Install with dev dependencies
+poetry install --with dev
+```
+
+### Running Tests
+
+```bash
+# Run full test suite (60+ tests)
+poetry run pytest
+
+# Run with coverage
+poetry run pytest --cov=content_ai --cov-report=term-missing
+
+# Run specific test file
+poetry run pytest tests/test_config.py -v
+```
+
+### Linting
+
+```bash
+# Check code with ruff
+poetry run ruff check src/ tests/
+
+# Auto-fix issues
+poetry run ruff check --fix src/ tests/
+```
+
+### Updating Dependencies
+
+```bash
+# Add a new dependency
+poetry add package-name
+
+# Add a dev dependency
+poetry add --group dev package-name
+
+# Update poetry.lock
+poetry lock
+
+# Regenerate requirements.txt for pip users
+poetry export -f requirements.txt --without-hashes -o requirements.txt
 ```
 
 ## ⚠️ Requirements
