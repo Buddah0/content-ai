@@ -1,56 +1,87 @@
 # Content AI
 
-**Content AI** is an intelligent engine that automatically turns raw gameplay footage into rhythmic "hype montages." It uses audio signal processing to detect percussive events (gunshots, explosions, critical hits) and stitches them together into a high-energy reel.
+**Content AI** is an intelligent pipeline that automatically detects high-energy moments in gameplay footage and generates rhythmic highlight montages. Using audio-first signal processing (HPSS + RMS thresholding), it identifies percussive events like gunshots, explosions, and critical hits, then stitches them into a polished video reel.
 
-## 📌 Project Status
+## Features
 
-### Status Snapshot
-- Latest on `main`: `84e2a31` (Jan 2, 2026) — Merge PR for batch processing
-- Baseline: `b74547e` (Dec 30, 2025) — initial docs/config + audio scripts
-- Current shape: modular pipeline + CLI + batch scanning + config + tests
+- **Audio-First Detection**: Uses librosa's HPSS (Harmonic-Percussive Source Separation) to isolate combat sounds from background music and voice
+- **Smart Merging**: Intelligently merges close-together clips with max duration enforcement and deterministic tie-breaking
+- **Batch Processing**: Recursively scans folders to process multiple videos in a single run
+- **Robust Rendering**: FFmpeg-based segment extraction and concatenation with process isolation
+- **Fully Configurable**: YAML-based configuration with CLI flag overrides and Pydantic validation
+- **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
+- **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
 
-### ✅ Current Capabilities
-- Automated hype detection (audio-first; percussive event detection)
-- Batch processing: scan folders recursively
-- Robust rendering: ffmpeg-based concatenation / safe video I/O
-- Configurable: CLI flags + YAML defaults
-- CLI:
-  - `python -m content_ai check`
-  - `python -m content_ai scan --input ...`
-- Tests: starter coverage exists (light unit tests under `tests/`)
+## Installation
 
-### 🚧 Recent Updates
+### Requirements
 
-- **Smart Merging**: ✅ Completed - Intelligent segment merging with max_duration enforcement and deterministic tie-breaking
-- **One-Command Demo**: ✅ Added `--demo` flag for zero-friction pipeline validation
+- **Python**: 3.11 or higher
+- **FFmpeg**: Must be available on your system (or `imageio-ffmpeg` will be used as fallback on Windows/WSL)
 
-### 🧪 Quick Demo (One-Command Promise)
+### Method 1: Poetry (Recommended)
 
-**Zero-friction validation** that the entire pipeline works end-to-end:
+Poetry is the source of truth for dependencies. `requirements.txt` is auto-generated for pip compatibility.
 
 ```bash
-# With Poetry (recommended)
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies
+poetry install
+
+# Verify installation
+poetry run content-ai check
+```
+
+### Method 2: pip (Alternative)
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate environment
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Verify installation
+python -m content_ai check
+```
+
+## Quick Start
+
+### One-Command Demo
+
+Zero-friction validation that the entire pipeline works end-to-end:
+
+```bash
+# With Poetry
 poetry run content-ai scan --demo
 
-# Or with pip
+# With pip
 python -m content_ai scan --demo
 ```
 
 This command:
-
-- Uses a bundled synthetic demo video (auto-generated on first run)
-- Detects percussive events using audio-first HPSS analysis
+- Auto-generates a synthetic demo video with percussive audio spikes (on first run)
+- Detects events using HPSS + RMS analysis
 - Applies Smart Merging with configurable parameters
 - Outputs `demo_output.mp4` in the repo root
-- Prints a detailed run summary with files scanned, events detected, and segments selected
+- Prints a detailed run summary
 - Exits with code 0 on success
 
 **Expected output:**
 
-```text
+```
 --- 🎬 DEMO MODE ---
 Using demo asset: /path/to/assets/demo/sample.mp4
 ...
+============================================================
 RUN SUMMARY
 ============================================================
 Files scanned:        1
@@ -63,204 +94,238 @@ Output path:          /path/to/demo_output.mp4
 ✅ Demo complete! Check demo_output.mp4
 ```
 
-### 🧪 Standard Usage (Golden Path)
+## Usage
 
-#### Using Poetry (Recommended)
+### Basic Commands
 
-1) Install Poetry if not already installed
-
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-2) Install dependencies
+**Check dependencies:**
 
 ```bash
-poetry install
-```
-
-3) Verify environment
-
-```bash
+# Poetry
 poetry run content-ai check
-```
 
-#### Using pip (Alternative)
-
-1) Create virtual environment + install deps
-
-```bash
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-2) Verify environment
-
-```bash
+# pip
 python -m content_ai check
 ```
 
-**Note:** Poetry is the source of truth for dependencies. `requirements.txt` is auto-generated via `poetry export` for pip compatibility.
-
-#### Running Commands
-
-**Batch scan** (recommended)
+**Scan a single file:**
 
 ```bash
-# With Poetry
+# Poetry
+poetry run content-ai scan --input gameplay.mp4
+
+# pip
+python -m content_ai scan --input gameplay.mp4
+```
+
+**Batch scan (recursive):**
+
+```bash
+# Poetry
 poetry run content-ai scan --input ./raw_videos --recursive
 
-# With pip
+# pip
 python -m content_ai scan --input ./raw_videos --recursive
 ```
 
-**Single file**
+### CLI Flags
+
+Override default configuration values:
 
 ```bash
-# With Poetry
-poetry run content-ai scan --input my_gameplay.mp4
-
-# With pip
-python -m content_ai scan --input my_gameplay.mp4
+content-ai scan --input ./videos \
+  --recursive \
+  --rms-threshold 0.15 \
+  --max-duration 120 \
+  --max-segments 15 \
+  --order score \
+  --keep-temp
 ```
 
-**Legacy mode** (wrapper preserved)
+**Available flags:**
+
+- `--input, -i`: Input file or directory (required unless using `--demo`)
+- `--demo`: Run demo mode with synthetic test video
+- `--output, -o`: Output directory (default: `output`)
+- `--recursive, -r`: Recursively scan subdirectories
+- `--ext`: Comma-separated file extensions (default: `mp4,mov,mkv,avi`)
+- `--limit`: Maximum number of input files to process
+- `--rms-threshold`: Override RMS energy threshold for event detection
+- `--max-duration`: Maximum montage duration in seconds
+- `--max-segments`: Maximum number of segments in final montage
+- `--order`: Segment ordering strategy (`chronological`, `score`, `hybrid`)
+- `--keep-temp`: Keep intermediate clip files (default: delete)
+
+### Legacy Mode
+
+The original script wrapper is preserved for backward compatibility:
 
 ```bash
-python make_reel.py my_gameplay.mp4
+python make_reel.py gameplay.mp4
 ```
 
-### ⚙️ Key Tunables
+## Configuration
 
-| Knob | Effect | Typical Default |
-| :--- | :--- | :---: |
-| `--rms-threshold` | Minimum RMS energy to consider an event | `0.10` |
-| `--merge-gap` | Merge segments closer than this (seconds) | `2.0` |
-| `--padding` | Padding added before/after each segment (seconds) | `1.0` |
-| `--max-duration` | Maximum length of the final montage (seconds) | `90` |
-| `--order` | Sorting strategy for output (`chronological`, `score`, `hybrid`) | `chronological` |
+### YAML Configuration File
 
-### 🧱 Architecture (Reality Check)
-- `scanner.py`: file discovery and input sanitization (walks directories, filters extensions)
-- `detector.py`: audio-first analysis, HPSS, RMS-based percussive event detection and scoring
-- `segments.py`: pure logic for clamping, merging, trimming, and sorting segments
-- `renderer.py`: ffmpeg/moviepy orchestration and safe video I/O
-- `pipeline.py`: orchestrates scan → detect → select → render
-- `cli.py`: public CLI surface and argument mapping
-- `config.py`: YAML loader and runtime overrides
+Defaults are defined in `config/default.yaml`. Create `config/local.yaml` for user-specific overrides (ignored by git).
 
-### ⚠️ Known Limitations / Gotchas
-- Audio-driven detection can be noisy depending on the music/voice mix; results vary by source material
-- **FFmpeg**: must be available on PATH or the environment; otherwise rendering will fail or fallback to `imageio-ffmpeg` on Windows/WSL
-- MoviePy 2.x is expected; API changes between major MoviePy versions may break rendering integrations
-
-### 🔜 Next Up (Priority Order)
-- Finish Smart Merging (WIP) + make it reliable
-- "One-command demo" polish (predictable output naming + run summary logs)
-- Expand tests + add CI
-
-### ✅ Definition of Done (Next Milestone)
-- One demo command in README that produces a montage from a sample folder
-- Clear output location + readable run summary
-- `python -m pytest tests/` passes
-
-## ✨ Key Features
-
-- **Automated Hype Detection**: Uses `librosa` HPSS (Harmonic-Percussive Source Separation) to isolate combat sounds from background music/voice.
-- **Batch Processing**: Scan entire folders recursively to generate montages from multiple source files.
-- **Smart Merging (WIP / In Progress)**: Intelligently merges close-together clips to preserve flow and context — feature is under active tuning and may change.
-- **Robust Rendering**: Safely handles video I/O with process isolation and `ffmpeg` concatenation.
-- **Configurable**: Fully customizable via CLI flags or YAML configuration files.
-
-## 🚀 Quickstart
-
-### 1. Installation
-
-Requires **Python 3.11+**.
-
-```bash
-# Create and activate a virtual environment
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+**Precedence rules:**
+```
+CLI flags > config/local.yaml > config/default.yaml
 ```
 
-### 2. Verify Setup
-Ensure dependencies (including `ffmpeg`) are correctly detected:
-```bash
-python -m content_ai check
+### Configuration Reference
+
+| Key | Type | Default | Description | Used In |
+|-----|------|---------|-------------|---------|
+| **detection.rms_threshold** | float | `0.10` | Minimum RMS energy to consider an event (range: 0.0–1.0) | detector.py |
+| **detection.min_event_duration_s** | float | `0.1` | Minimum event duration in seconds | detector.py |
+| **detection.hpss_margin** | tuple | `[1.0, 5.0]` | HPSS margins for harmonic/percussive separation | detector.py |
+| **processing.context_padding_s** | float | `1.0` | Pre/post-roll padding around each event in seconds | segments.py |
+| **processing.merge_gap_s** | float | `2.0` | Maximum gap to merge adjacent segments in seconds | segments.py |
+| **processing.max_segment_duration_s** | float | `10.0` | Maximum duration for any merged segment in seconds | segments.py |
+| **output.max_duration_s** | int | `90` | Maximum length of final montage in seconds | pipeline.py |
+| **output.max_segments** | int | `12` | Maximum number of segments in montage | pipeline.py |
+| **output.order** | string | `"chronological"` | Sorting strategy: `chronological`, `score`, `hybrid` | pipeline.py |
+| **output.keep_temp** | bool | `false` | Whether to keep intermediate clip files | pipeline.py |
+
+**Example `config/local.yaml`:**
+
+```yaml
+detection:
+  rms_threshold: 0.15  # Higher threshold for less noisy sources
+
+processing:
+  merge_gap_s: 3.0     # Merge segments closer than 3s
+
+output:
+  max_duration_s: 120  # 2-minute montages
+  order: "score"       # Sort by energy score
 ```
 
-### 3. Usage
+## Architecture
 
-#### Batch Scan (Recommended)
-Scan a folder (and subfolders) for video files and generate a montage.
-```bash
-python -m content_ai scan --input ./raw_videos --recursive
+### Pipeline Flow
+
+```
+Scanner → Detector → Segment Processor → Renderer
+   ↓          ↓             ↓                ↓
+ Files    Events        Segments         Montage
 ```
 
-#### Single File
-```bash
-python -m content_ai scan --input my_gameplay.mp4
+### Module Responsibilities
+
+| Module | Purpose | Key Functions |
+|--------|---------|---------------|
+| **scanner.py** | File discovery and input sanitization | `scan_input()`: Walks directories, filters by extension |
+| **detector.py** | Audio-first analysis using HPSS + RMS | `detect_hype()`: Extracts audio, runs HPSS, detects percussive events |
+| **segments.py** | Pure logic for segment operations | `merge_segments()`, `pad_segments()`, `clamp_segments()`, `filter_min_duration()` |
+| **renderer.py** | FFmpeg/MoviePy orchestration | `render_segment_to_file()`, `build_montage_from_list()`, `check_ffmpeg()` |
+| **pipeline.py** | Orchestrates scan → detect → select → render | `run_scan()`: Main entry point coordinating all modules |
+| **cli.py** | Public CLI surface and argument mapping | `main()`: Parses args, invokes pipeline |
+| **config.py** | YAML loader with Pydantic validation | `resolve_config()`: Merges defaults, local overrides, CLI flags |
+| **models.py** | Pydantic data models for validation | `ContentAIConfig`, `Segment`, `DetectionEvent` |
+| **demo.py** | Synthetic demo video generation | `get_demo_asset_path()`, `generate_demo_video()` |
+
+### Output Structure
+
+Each run creates a timestamped directory under `output/`:
+
+```
+output/
+├── run_001/
+│   ├── montage.mp4           # Final output video
+│   ├── segments.json         # Selected segments with metadata
+│   ├── resolved_config.json  # Exact runtime configuration
+│   └── run_meta.json         # Run summary (files, events, duration)
+├── run_002/
+│   └── ...
 ```
 
-#### Legacy Mode
-The original script is preserved as a wrapper around the new engine:
-```bash
-python make_reel.py my_gameplay.mp4
-```
+**Demo mode outputs:**
+- `demo_output.mp4` in repo root
+- Metadata saved to `output/demo_run/`
 
-## ⚙️ Configuration
+## Smart Merging
 
-Defaults are defined in `config/default.yaml`. You can override them using CLI arguments.
+Smart Merging is the core post-processing logic that transforms raw detected events into intelligent, viewer-friendly segments.
 
-| Argument | Description | Default |
-| :--- | :--- | :--- |
-| `--rms-threshold` | Volume threshold for event detection | `0.10` |
-| `--merge-gap` | Merge segments closer than this (seconds) | `2.0` |
-| `--padding` | Padding around each event (seconds) | `1.0` |
-| `--max-duration` | Max length of final montage | `90s` |
-| `--order` | Sorting strategy (`chronological`, `score`, `hybrid`) | `chronological` |
+### How It Works
 
-## 📂 Project Structure
+1. **Padding**: Apply pre-roll and post-roll (`context_padding_s`) to each raw event
+2. **Clamping**: Constrain padded segments to video duration boundaries
+3. **Merging**: If gap between segments < `merge_gap_s`, merge them into one
+4. **Max Duration Enforcement**: If merging would exceed `max_segment_duration_s`, keep the segment window with highest peak energy (deterministic tie-breaking)
+5. **Filtering**: Remove segments shorter than `min_event_duration_s`
+
+### Guardrails
+
+- **Max duration cap**: Prevents excessively long merged segments that lose viewer attention
+- **Deterministic tie-breaking**: When two segments have equal score, keeps the first encountered (chronological priority)
+- **Boundary clamping**: Ensures segments never exceed video start/end times
+- **Score preservation**: Merged segments retain the highest peak RMS score from constituent events
+
+### Known Limitations
+
+- Audio-driven detection can be noisy depending on music/voice mix in source material
+- Results vary based on source loudness and percussive clarity
+- Over-merging can occur with very low `merge_gap_s` values
+- Under-merging can occur with very high `rms_threshold` values
+
+## Demo Command Philosophy
+
+The demo command embodies the project's commitment to **deterministic, reproducible output**:
+
+- **Synthetic test data**: Auto-generated demo video with known percussive spikes at specific timestamps
+- **Predictable thresholds**: Uses default config values (`rms_threshold=0.10`, `merge_gap_s=2.0`, etc.)
+- **Deterministic naming**: Output always goes to `demo_output.mp4`
+- **Run summary**: Prints files scanned, events detected, segments selected, total duration
+- **Exit code contract**: Exits with 0 on success, non-zero on failure
+
+This design ensures the demo serves as both:
+1. **Zero-friction onboarding** for new users
+2. **Smoke test** validating the entire pipeline in CI/CD
+
+## Project Structure
 
 ```
 content-ai/
 ├── src/
-│   └── content_ai/          # Core Package (src layout)
+│   └── content_ai/          # Core package (src layout)
 │       ├── cli.py           # Command-line interface
-│       ├── config.py        # Config loader with Pydantic
+│       ├── config.py        # YAML loader + Pydantic validation
 │       ├── models.py        # Pydantic data models
-│       ├── detector.py      # Audio analysis logic
-│       ├── pipeline.py      # Orchestrator
-│       ├── renderer.py      # Video rendering (ffmpeg/moviepy)
+│       ├── detector.py      # HPSS + RMS audio analysis
+│       ├── pipeline.py      # Orchestrates scan → detect → render
+│       ├── renderer.py      # FFmpeg/MoviePy video operations
 │       ├── scanner.py       # File discovery
-│       └── segments.py      # Pure logic (merging/clamping)
-├── tests/                   # Comprehensive test suite (60+ tests)
-│   ├── test_config.py       # Config loading & Pydantic validation
-│   ├── test_models.py       # Pydantic model validation
-│   ├── test_scanner.py      # File scanning & batch processing
+│       ├── segments.py      # Pure segment logic (merge/pad/clamp)
+│       ├── demo.py          # Synthetic demo video generation
+│       ├── __init__.py
+│       └── __main__.py
+├── tests/                   # Test suite (60 tests, 45% coverage)
 │   ├── test_cli.py          # CLI smoke tests
+│   ├── test_config.py       # Config loading + Pydantic validation
+│   ├── test_models.py       # Pydantic model validation
+│   ├── test_scanner.py      # File scanning + batch processing
 │   └── test_segments.py     # Segment merging logic
 ├── config/
 │   └── default.yaml         # Authoritative defaults
-├── output/                  # Generated runs (run_001, run_002...)
+├── output/                  # Generated runs (run_001, run_002, ...)
+├── assets/
+│   └── demo/                # Auto-generated on first --demo run
+│       └── sample.mp4       # Synthetic test video
 ├── pyproject.toml           # Poetry configuration (source of truth)
 ├── poetry.lock              # Locked dependencies
-├── requirements.txt         # Generated from Poetry (pip fallback)
-└── make_reel.py             # Legacy wrapper
+├── requirements.txt         # Auto-generated from Poetry (pip fallback)
+├── make_reel.py             # Legacy wrapper (backward compatibility)
+├── ARCHITECTURE.md          # Architecture decision record
+├── copilot.md               # Design principles + pipeline philosophy
+└── README.md                # This file
 ```
 
-## 🛠️ Development
+## Development
 
 ### Setup
 
@@ -272,14 +337,14 @@ poetry install --with dev
 ### Running Tests
 
 ```bash
-# Run full test suite (60+ tests)
+# Run full test suite (60 tests)
 poetry run pytest
 
 # Run with coverage
 poetry run pytest --cov=content_ai --cov-report=term-missing
 
 # Run specific test file
-poetry run pytest tests/test_config.py -v
+poetry run pytest tests/test_segments.py -v
 ```
 
 ### Linting
@@ -308,38 +373,80 @@ poetry lock
 poetry export -f requirements.txt --without-hashes -o requirements.txt
 ```
 
-## ⚠️ Requirements
-- **FFmpeg**: Must be available on your system.
-  - On Windows/WSL, the tool attempts to use `imageio-ffmpeg` automatically if the system `ffmpeg` is missing.
-- **MoviePy 2.x**: This project uses the latest MoviePy v2 API.
+## Technical Details
 
-## AI/ML Pipeline Transparency (Guidance)
-- Audio-first detection: the pipeline prioritizes audio cues (HPSS + RMS) to find percussive events before applying video heuristics.
-- HPSS: harmonic/percussive separation is used to enhance percussive events; results depend on `librosa`'s algorithms and source material.
-- Event scoring: detected events are assigned scores (energy, prominence, temporal isolation) used for sorting/selection.
-- Determinism: processing is mostly deterministic given identical inputs and configs, but external factors (FFmpeg build, thread scheduling) can introduce minor variation.
-- Reproducibility: pin dependencies and supply identical input files and `config/default.yaml` to reproduce runs reliably.
+### Audio-First Detection Pipeline
 
-## Content-Creation Workflow Expectations
-- Clip selection: `detector.py` yields candidate timestamps; `segments.py` applies padding and merge rules to create final clip list.
-- Timing: timestamps are derived from audio sample indices and converted to seconds; rounding/trimming may occur to match container frame times.
-- Merging (WIP): close events are fused based on `--merge-gap` and scoring heuristics; behavior is being refined to avoid over- or under-merging.
-- Rendering: `renderer.py` exports clips and concatenates them via ffmpeg/job isolation to prevent corrupting sources.
-- Output layout: runs are stored under `output/run_<NNN>/` with `resolved_config.json`, `segments.json`, and `run_meta.json` for reproducibility.
+1. **Audio Extraction**: MoviePy extracts audio to temporary WAV file
+2. **HPSS Separation**: Librosa splits audio into harmonic and percussive components
+3. **RMS Calculation**: Root Mean Square energy computed over hop windows on percussive track
+4. **Thresholding**: Fixed threshold (`rms_threshold`) applied to identify high-energy events
+5. **Event Collapsing**: Consecutive high-energy frames collapsed into start/end timestamps
+6. **Metadata Capture**: Peak RMS score recorded for each event
 
-## Operational Guarantees
-- Performance: CPU-bound audio analysis; processing time scales with audio length and sample rate.
-- Memory: keep an eye on large inputs — the pipeline processes audio in-memory for accurate HPSS; consider downsampling long files.
-- FFmpeg subprocess isolation: the renderer spawns isolated ffmpeg jobs to avoid leaking file descriptors or corrupting the working process.
-- Safe file handling: original inputs are never overwritten; outputs are written to new run folders.
+### Determinism and Reproducibility
 
-## Extensibility Notes
-- Add new detectors: implement a detector interface in `detector.py` or add modules and expose them via `cli.py`/`config.py`.
-- Add new renderers: `renderer.py` is modular — new backends (direct ffmpeg, cloud renderers) can be plugged in with minimal orchestration changes.
-- Config overrides: runtime CLI flags override `config/default.yaml` values; use the `resolved_config.json` in output to capture the exact runtime config.
+- **Processing**: Mostly deterministic given identical inputs and configs
+- **External factors**: FFmpeg build version and thread scheduling can introduce minor variation
+- **Reproducibility**: Pin dependencies via `poetry.lock` and use identical `config/default.yaml` to reproduce runs
+- **Run metadata**: `resolved_config.json` captures exact runtime config for each run
 
-## Quality & Evaluation
-- "Good output": coherent sequence of high-energy clips, minimal dead-air, and natural pacing between segments.
-- Tuning: adjust `--rms-threshold`, `--merge-gap`, and `--padding` to match source loudness and desired pacing.
-- Logs: the run produces `run_meta.json` and `segments.json` — review these to understand selection and ordering decisions.
+### Rendering Strategy
 
+- **Process isolation**: FFmpeg spawned in subprocess to prevent file descriptor leaks
+- **Codec**: Uses `libx264` video codec and `aac` audio codec (standard H.264/AAC MP4)
+- **Preset**: `ultrafast` preset for speed optimization
+- **Concatenation**: FFmpeg concat demuxer (`-f concat -c copy`) for safe assembly without re-encoding
+- **Safe file handling**: Original inputs never overwritten; outputs written to new run folders
+
+### Performance Characteristics
+
+- **Bottleneck**: CPU-bound audio analysis (HPSS + RMS)
+- **Scaling**: Processing time scales with audio length and sample rate
+- **Memory**: Audio processed in-memory for accurate HPSS; consider downsampling very long files
+- **Parallel processing**: Not currently implemented; runs process files sequentially
+
+## Roadmap / Next Up
+
+### In Progress: Job Queue + Resumable Runs
+
+Add a manifest-backed run state so batch runs can be queued, resumed, and skip already-processed inputs safely.
+
+**Success criteria:**
+
+- [ ] A persistent run manifest (e.g., JSON) records per-input status, outputs, and config fingerprint
+- [ ] Re-running the same command resumes incomplete items and skips completed ones deterministically
+- [ ] Planned CLI surface to inspect queue/run status (e.g., `status` or `--resume`/`--force` flags)
+- [ ] Clear failure modes and recovery documented (corrupt manifest, changed config, missing files)
+
+## Known Issues
+
+- **FFmpeg dependency**: Must be available on PATH or the environment; otherwise rendering will fail or fallback to `imageio-ffmpeg` on Windows/WSL
+- **MoviePy version**: Pinned to 1.0.3 due to decorator dependency constraints; API changes in MoviePy 2.x may break rendering integrations in future versions
+- **Noisy audio detection**: Results vary significantly based on source material loudness and music/voice mix
+- **No visual analysis**: Detection is purely audio-driven; visual cues (kill feed, damage numbers) are not considered
+
+## License
+
+MIT
+
+## Contributing
+
+This project uses Poetry for dependency management and Pydantic for validation. See [Development](#development) for setup instructions.
+
+**Pre-commit checklist:**
+
+```bash
+# Lint
+poetry run ruff check src/ tests/
+
+# Tests
+poetry run pytest
+
+# CLI smoke test
+poetry run content-ai check
+```
+
+---
+
+**Built with audio-first detection, deterministic output, and zero-friction validation.**
