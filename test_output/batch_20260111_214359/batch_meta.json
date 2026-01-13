@@ -1,0 +1,46 @@
+{
+  "batch_name": "batch_20260111_214359",
+  "timestamp": "2026-01-11T21:44:25.773923",
+  "config": {
+    "detection": {
+      "rms_threshold": 0.1,
+      "min_event_duration_s": 0.1,
+      "hpss_margin": [
+        1.0,
+        5.0
+      ]
+    },
+    "processing": {
+      "context_padding_s": 1.0,
+      "merge_gap_s": 2.0,
+      "max_segment_duration_s": 10.0
+    },
+    "output": {
+      "max_duration_s": 90,
+      "max_segments": 12,
+      "order": "chronological",
+      "keep_temp": false
+    }
+  },
+  "enqueue_stats": {
+    "enqueued": 1,
+    "cached": 0,
+    "failed_hash": 0,
+    "total": 1
+  },
+  "process_stats": {
+    "succeeded": 1,
+    "failed": 0,
+    "skipped": 0,
+    "total_duration": 25.438772916793823
+  },
+  "cli_args": {
+    "command": "process",
+    "input": "content ai test sound.mp4",
+    "output": "test_output",
+    "recursive": false,
+    "db": "test_pipeline.db",
+    "force": false,
+    "no_process": false
+  }
+}

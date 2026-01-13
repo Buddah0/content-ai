@@ -210,4 +210,49 @@ python -m content_ai scan --demo
 
 ---
 
+## Operational Rules for AI Agents
+
+**File Generation:**
+Do not generate intermediate markdown files (e.g., scratchpads, plans, logs, summaries) on the filesystem. Output your reasoning in the chat or as code comments only. The only markdown files that should exist are: README.md, ARCHITECTURE.md, copilot.md.
+
+**Typing Standards:**
+- All functions must have type hints (PEP 484)
+- Use Pydantic models for config and data validation
+- No `Any` types without justification in comments
+
+**Config Conventions:**
+- All config parameters must be defined in `config/default.yaml`
+- Pydantic models in `models.py` enforce validation at load time
+- CLI overrides take precedence: CLI flags > `config/local.yaml` > `config/default.yaml`
+- Never hardcode thresholds or paths in source code
+
+**Adding Pipeline Stages:**
+- Detection logic goes in `detector.py` (pure detection, no merging)
+- Segment processing goes in `segments.py` (pure functions, no I/O)
+- Rendering logic goes in `renderer.py` (FFmpeg/MoviePy only)
+- Pipeline orchestration goes in `pipeline.py` (coordinates all stages)
+- Never bypass the linear pipeline flow (Scan → Detect → Select → Render)
+
+**Testing Expectations:**
+- Unit tests required for all new modules
+- Use synthetic data (no large video files in tests)
+- Test edge cases: empty inputs, boundary conditions, invalid config
+- Coverage target: 80%+ (currently 46%)
+- Demo mode (`--demo`) serves as integration smoke test
+
+**Queue System Modifications:**
+- Never bypass ACID guarantees (always use atomic transactions)
+- State transitions must follow state machine rules (see ARCHITECTURE.md)
+- Dirty detection must be deterministic (two-tier hashing)
+- Never mark job as succeeded without validating all output files exist
+- Heartbeat threads required for jobs >5 minutes
+
+**Documentation Requirements:**
+- Architecture decisions go in ARCHITECTURE.md
+- User-facing docs go in README.md
+- AI/design principles go in copilot.md (this file)
+- No duplicate information across files (single source of truth)
+
+---
+
 **This document is the source of truth. When in doubt, refer here.**
