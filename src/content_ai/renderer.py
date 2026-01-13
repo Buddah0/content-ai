@@ -26,7 +26,7 @@ def render_segment_to_file(
         if end <= start:
             return  # Skip invalid
 
-        new_clip = video.subclipped(start, end)
+        new_clip = video.subclip(start, end)
         # using 'fast' preset for speed, crf for quality
         # audio_codec aac is standard
         new_clip.write_videofile(
