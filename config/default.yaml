@@ -16,3 +16,43 @@ output:
   max_segments: 12
   order: "chronological" # chronological, score, hybrid
   keep_temp: false
+
+# Rendering Configuration (FFmpeg Runner + VFR Safety)
+rendering:
+  # Render Contract - Guaranteed output specifications
+  contract:
+    container: "mp4"
+    video_codec:
+      codec: "libx264"
+      profile: "high"           # baseline, main, high
+      level: "4.1"              # H.264 level (supports 1080p@30fps)
+      pixel_format: "yuv420p"   # Broad device compatibility
+      target_fps: 30            # CFR target (null = preserve source fps)
+      crf: 23                   # Quality (18=near lossless, 23=good, 28=lower)
+      preset: "medium"          # ultrafast, fast, medium, slow (speed vs compression)
+    audio_codec:
+      codec: "aac"
+      sample_rate: 48000        # Hz
+      channels: 2               # Stereo
+      bitrate: "192k"
+
+  # Safety Settings
+  normalize_to_contract: false  # Re-encode segments to contract specs (disabled for PR #1)
+  validate_before_concat: true  # Probe segments before concat
+  force_cfr: true               # Convert VFR → CFR to prevent audio desync
+  fast_path_enabled: true       # Allow -c copy for compatible sources
+
+  # VFR Detection
+  vfr_detection:
+    frame_rate_tolerance: 0.01  # 1% tolerance for VFR detection
+
+  # Timeout Enforcement (Prevents Zombie Processes)
+  global_timeout_s: 1800         # 30 min max per FFmpeg operation
+  no_progress_timeout_s: 120     # 2 min stall detection
+  max_retries: 2                 # Retry transient errors
+  kill_grace_period_s: 5         # SIGTERM → SIGKILL grace period
+
+  # Failure Debugging
+  save_artifacts_on_failure: true  # Save logs + reproducible commands
+  ffmpeg_loglevel: "info"          # error, warning, info, verbose
+  temp_dir: null                   # null = use worker-specific temp dir
