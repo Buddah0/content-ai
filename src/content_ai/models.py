@@ -163,8 +163,8 @@ class RenderingConfig(BaseModel):
         description="Render contract specifying guaranteed output format"
     )
     normalize_to_contract: bool = Field(
-        default=False,  # Non-breaking: disabled by default for PR #1
-        description="Re-encode segments to contract specs (ensures VFR safety)"
+        default=True,
+        description="Re-encode segments to contract specs (ensures VFR safety and consistent output)"
     )
     validate_before_concat: bool = Field(
         default=True,

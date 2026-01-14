@@ -3,7 +3,7 @@ import json
 import subprocess
 from pathlib import Path
 from moviepy.editor import VideoFileClip
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Optional, Callable
 from dataclasses import dataclass
 import imageio_ffmpeg
 
@@ -105,7 +105,7 @@ def check_ffmpeg():
             check=True,
         )
         return True
-    except:
+    except (FileNotFoundError, subprocess.CalledProcessError, OSError):
         return False
 
 

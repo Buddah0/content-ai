@@ -303,10 +303,7 @@ def process_video_job(
                     )
 
                     if not result.success:
-                        # Check if error is permanent or transient
-                        is_permanent = (
-                            result.error_type == FfmpegErrorType.PERMANENT
-                        )
+                        # Build error message with artifact info
                         error_msg = (
                             f"FFmpeg rendering failed for segment {i}: "
                             f"{result.stderr[:500] if result.stderr else 'Unknown error'}"
@@ -314,7 +311,13 @@ def process_video_job(
                         if result.artifacts_saved:
                             error_msg += f"\nArtifacts: {result.artifacts_saved}"
 
-                        raise RuntimeError(error_msg) if is_permanent else OSError(error_msg)
+                        # Raise appropriate exception based on error type
+                        # Permanent errors (bad input) should not be retried
+                        # Transient errors (I/O issues) may be retried
+                        if result.error_type == FfmpegErrorType.PERMANENT:
+                            raise RuntimeError(error_msg)
+                        else:
+                            raise OSError(error_msg)
                 else:
                     # Legacy MoviePy-based rendering
                     renderer.render_segment_to_file(
