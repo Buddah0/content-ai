@@ -151,7 +151,8 @@ def process_video_job(
     job: JobItem,
     config: Dict[str, Any],
     db_path: str,
-    run_dir: Path
+    run_dir: Path,
+    use_ffmpeg_runner: bool = False
 ) -> JobResult:
     """Worker function: processes single video job.
 
@@ -168,6 +169,8 @@ def process_video_job(
         config: Resolved configuration dictionary
         db_path: Path to SQLite database (queue recreated in worker)
         run_dir: Output directory for this run
+        use_ffmpeg_runner: If True, use FfmpegRunner with progress callbacks
+                           (recommended for production - prevents zombie processes)
 
     Returns:
         JobResult with status, output files, and timing
@@ -276,14 +279,51 @@ def process_video_job(
             output_files = []
             video_name = video_path.stem
 
+            # Get rendering config if using FfmpegRunner
+            rendering_config = None
+            if use_ffmpeg_runner:
+                from ..models import RenderingConfig
+                rendering_config_dict = config.get("rendering", {})
+                rendering_config = RenderingConfig(**rendering_config_dict)
+
             for i, segment in enumerate(merged):
                 output_path = run_dir / f"{video_name}_clip_{i:03d}.mp4"
-                renderer.render_segment_to_file(
-                    source_path=str(video_path),
-                    start=segment['start'],
-                    end=segment['end'],
-                    output_path=str(output_path)
-                )
+
+                if use_ffmpeg_runner:
+                    # Use FfmpegRunner with progress tracking and timeout enforcement
+                    from ..ffmpeg_runner import FfmpegErrorType
+
+                    result = renderer.render_segment_with_runner(
+                        source_path=str(video_path),
+                        start=segment['start'],
+                        end=segment['end'],
+                        output_path=str(output_path),
+                        rendering_config=rendering_config,
+                        progress_callback=None  # Could wire to heartbeat in future
+                    )
+
+                    if not result.success:
+                        # Check if error is permanent or transient
+                        is_permanent = (
+                            result.error_type == FfmpegErrorType.PERMANENT
+                        )
+                        error_msg = (
+                            f"FFmpeg rendering failed for segment {i}: "
+                            f"{result.stderr[:500] if result.stderr else 'Unknown error'}"
+                        )
+                        if result.artifacts_saved:
+                            error_msg += f"\nArtifacts: {result.artifacts_saved}"
+
+                        raise RuntimeError(error_msg) if is_permanent else OSError(error_msg)
+                else:
+                    # Legacy MoviePy-based rendering
+                    renderer.render_segment_to_file(
+                        source_path=str(video_path),
+                        start=segment['start'],
+                        end=segment['end'],
+                        output_path=str(output_path)
+                    )
+
                 output_files.append(str(output_path))
 
             # 4. Mark success
