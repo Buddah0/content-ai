@@ -67,12 +67,164 @@ class OutputConfig(BaseModel):
     )
 
 
+class VideoCodecConfig(BaseModel):
+    """Video codec specifications for render contract."""
+
+    codec: str = Field(
+        default="libx264",
+        description="Video codec name (e.g., libx264, libx265)"
+    )
+    profile: Literal["baseline", "main", "high"] = Field(
+        default="high",
+        description="H.264 profile level"
+    )
+    level: str = Field(
+        default="4.1",
+        description="H.264 level (e.g., 4.1 supports 1080p@30fps)"
+    )
+    pixel_format: str = Field(
+        default="yuv420p",
+        description="Pixel format (yuv420p for broad compatibility)"
+    )
+    target_fps: Optional[int] = Field(
+        default=30,
+        gt=0,
+        description="Target frame rate for CFR (None = preserve source fps)"
+    )
+    crf: int = Field(
+        default=23,
+        ge=0,
+        le=51,
+        description="Constant Rate Factor (0-51, lower = better quality)"
+    )
+    preset: Literal["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"] = Field(
+        default="medium",
+        description="Encoding speed preset (faster = larger files)"
+    )
+
+
+class AudioCodecConfig(BaseModel):
+    """Audio codec specifications for render contract."""
+
+    codec: str = Field(
+        default="aac",
+        description="Audio codec name (e.g., aac, mp3)"
+    )
+    sample_rate: int = Field(
+        default=48000,
+        gt=0,
+        description="Audio sample rate in Hz"
+    )
+    channels: int = Field(
+        default=2,
+        ge=1,
+        le=8,
+        description="Audio channels (1=mono, 2=stereo)"
+    )
+    bitrate: str = Field(
+        default="192k",
+        description="Audio bitrate (e.g., '128k', '192k', '320k')"
+    )
+
+
+class RenderContractConfig(BaseModel):
+    """Render contract defining guaranteed output specifications."""
+
+    container: str = Field(
+        default="mp4",
+        description="Container format"
+    )
+    video_codec: VideoCodecConfig = Field(
+        default_factory=VideoCodecConfig,
+        description="Video codec settings"
+    )
+    audio_codec: AudioCodecConfig = Field(
+        default_factory=AudioCodecConfig,
+        description="Audio codec settings"
+    )
+
+
+class VFRDetectionConfig(BaseModel):
+    """VFR detection parameters."""
+
+    frame_rate_tolerance: float = Field(
+        default=0.01,
+        ge=0.0,
+        le=1.0,
+        description="Max fractional difference between avg_frame_rate and r_frame_rate to consider VFR"
+    )
+
+
+class RenderingConfig(BaseModel):
+    """FFmpeg rendering configuration with normalization controls."""
+
+    contract: RenderContractConfig = Field(
+        default_factory=RenderContractConfig,
+        description="Render contract specifying guaranteed output format"
+    )
+    normalize_to_contract: bool = Field(
+        default=False,  # Non-breaking: disabled by default for PR #1
+        description="Re-encode segments to contract specs (ensures VFR safety)"
+    )
+    validate_before_concat: bool = Field(
+        default=True,
+        description="Probe segments before concat to verify compatibility"
+    )
+    force_cfr: bool = Field(
+        default=True,
+        description="Convert VFR to CFR to prevent audio desync"
+    )
+    fast_path_enabled: bool = Field(
+        default=True,
+        description="Allow -c copy for compatible sources (speed optimization)"
+    )
+    vfr_detection: VFRDetectionConfig = Field(
+        default_factory=VFRDetectionConfig,
+        description="VFR detection settings"
+    )
+
+    # FFmpeg runner settings
+    global_timeout_s: int = Field(
+        default=1800,
+        gt=0,
+        description="Maximum duration for any FFmpeg operation in seconds (30 min default)"
+    )
+    no_progress_timeout_s: int = Field(
+        default=120,
+        gt=0,
+        description="Timeout if no progress update in N seconds (stall detection)"
+    )
+    max_retries: int = Field(
+        default=2,
+        ge=0,
+        description="Number of retry attempts for transient errors"
+    )
+    temp_dir: Optional[str] = Field(
+        default=None,
+        description="Temporary directory for artifacts (None = use worker temp dir)"
+    )
+    kill_grace_period_s: int = Field(
+        default=5,
+        gt=0,
+        description="Grace period between SIGTERM and SIGKILL"
+    )
+    save_artifacts_on_failure: bool = Field(
+        default=True,
+        description="Save FFmpeg logs and commands on failure for debugging"
+    )
+    ffmpeg_loglevel: str = Field(
+        default="info",
+        description="FFmpeg log level: error, warning, info, verbose"
+    )
+
+
 class ContentAIConfig(BaseModel):
     """Complete application configuration with validation."""
 
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    rendering: RenderingConfig = Field(default_factory=RenderingConfig)
 
     @classmethod
     def from_dict(cls, data: dict) -> "ContentAIConfig":
