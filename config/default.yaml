@@ -37,7 +37,7 @@ rendering:
       bitrate: "192k"
 
   # Safety Settings
-  normalize_to_contract: false  # Re-encode segments to contract specs (disabled for PR #1)
+  normalize_to_contract: true   # Re-encode segments to contract specs (ensures VFR safety)
   validate_before_concat: true  # Probe segments before concat
   force_cfr: true               # Convert VFR → CFR to prevent audio desync
   fast_path_enabled: true       # Allow -c copy for compatible sources

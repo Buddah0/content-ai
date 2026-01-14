@@ -2,17 +2,13 @@
 
 import json
 import subprocess
-import tempfile
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from content_ai.renderer import (
     VideoMetadata,
     probe_video,
     should_use_fast_path,
     validate_segment_compatibility,
-    render_segment_with_runner,
-    concat_with_runner
 )
 
 

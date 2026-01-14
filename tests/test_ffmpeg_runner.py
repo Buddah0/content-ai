@@ -408,7 +408,7 @@ class TestConfigValidation:
         assert config.kill_grace_period_s == 5
         assert config.save_artifacts_on_failure is True
         assert config.ffmpeg_loglevel == "info"
-        assert config.normalize_to_contract is False  # Non-breaking default
+        assert config.normalize_to_contract is True  # Enabled by default for VFR safety
 
     def test_video_codec_config_validation(self):
         """Test VideoCodecConfig validation."""

@@ -7,8 +7,8 @@
 - **Audio-First Detection**: Uses librosa's HPSS (Harmonic-Percussive Source Separation) to isolate combat sounds from background music and voice
 - **Smart Merging**: Intelligently merges close-together clips with max duration enforcement and deterministic tie-breaking
 - **Batch Processing**: Recursively scans folders to process multiple videos in a single run
-- **Job Queue System**: ✨ **NEW** - Resumable batch processing with crash recovery, dirty detection, and parallel execution
-- **Robust Rendering**: FFmpeg-based segment extraction and concatenation with process isolation
+- **Job Queue System**: Resumable batch processing with crash recovery, dirty detection, and parallel execution
+- **Robust Rendering**: ✨ **COMPLETE** - Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
 - **Fully Configurable**: YAML-based configuration with CLI flag overrides and Pydantic validation
 - **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
 - **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
@@ -118,7 +118,8 @@ content-ai/
 │       ├── queued_pipeline.py # Queue-based batch processing wrapper
 │       ├── detector.py       # Audio-first detection (HPSS + RMS thresholding)
 │       ├── segments.py       # Segment logic (merge, pad, clamp, filter)
-│       ├── renderer.py       # Robust rendering (MoviePy + FFmpeg concat)
+│       ├── renderer.py       # Robust rendering with VFR safety
+│       ├── ffmpeg_runner.py  # FFmpeg orchestration (timeout, progress)
 │       ├── scanner.py        # File discovery (recursive, extension filtering)
 │       ├── config.py         # YAML config loader + CLI override merging
 │       ├── models.py         # Pydantic data models (validation)
@@ -131,15 +132,19 @@ content-ai/
 │       │   └── hashing.py    # Two-tier input/config fingerprinting
 │       ├── __init__.py
 │       └── __main__.py       # Package entry point
-├── tests/                    # Test suite (79 tests, 46% coverage)
+├── tests/                    # Test suite (123 tests, 55% coverage)
 │   ├── test_cli.py           # CLI smoke tests
 │   ├── test_config.py        # Config loading + Pydantic validation
 │   ├── test_models.py        # Pydantic model validation
 │   ├── test_scanner.py       # File scanning + batch processing
 │   ├── test_segments.py      # Segment merging logic
-│   └── test_queue.py         # Queue system tests (19 tests)
+│   ├── test_queue.py         # Queue system tests
+│   ├── test_ffmpeg_runner.py # FFmpeg runner tests
+│   └── test_renderer.py      # Renderer + VFR detection tests
 ├── config/
-│   └── default.yaml          # Authoritative defaults (detection, processing, output)
+│   └── default.yaml          # Authoritative defaults (detection, processing, output, rendering)
+├── docs/
+│   └── RENDERING.md          # Robust rendering system documentation
 ├── output/                   # Generated runs (run_001/, run_002/, ...)
 ├── pyproject.toml            # Poetry configuration (source of truth)
 ├── poetry.lock               # Locked dependencies
@@ -174,7 +179,9 @@ content-ai/
 
 - **`segments.py`** — Pure segment logic. Functions: `pad_segments()`, `merge_segments()`, `clamp_segments()`, `filter_min_duration()`. No I/O, no side effects. Changes to merging rules, max duration enforcement, or tie-breaking go here.
 
-- **`renderer.py`** — Robust rendering. `render_segment_to_file()` extracts clips using MoviePy. `build_montage_from_list()` assembles clips using FFmpeg concat demuxer (no re-encoding). Changes to codecs, presets, or rendering strategy go here.
+- **`renderer.py`** — Robust rendering with VFR safety. `render_segment_with_runner()` extracts clips using FfmpegRunner with timeout enforcement. `probe_video()` detects VFR sources. Legacy `render_segment_to_file()` preserved for backward compatibility.
+
+- **`ffmpeg_runner.py`** — FFmpeg orchestration. Process isolation, dual timeout (global + no-progress), progress monitoring, error classification, artifact preservation. See [docs/RENDERING.md](docs/RENDERING.md).
 
 - **`scanner.py`** — File discovery. Recursively scans directories, filters by extension, applies limit. Returns list of absolute paths. Changes to file filtering logic go here.
 
@@ -650,11 +657,15 @@ poetry export -f requirements.txt --without-hashes -o requirements.txt
 
 ### Rendering Strategy
 
-- **Process isolation**: FFmpeg spawned in subprocess to prevent file descriptor leaks
-- **Codec**: Uses `libx264` video codec and `aac` audio codec (standard H.264/AAC MP4)
-- **Preset**: `ultrafast` preset for speed optimization
-- **Concatenation**: FFmpeg concat demuxer (`-f concat -c copy`) for safe assembly without re-encoding
+- **Process isolation**: FFmpeg spawned via `subprocess.Popen` with process tree cleanup
+- **Dual timeout**: Global (30 min) + no-progress (2 min) timeout enforcement
+- **VFR safety**: Automatic detection and CFR normalization to prevent audio desync
+- **Render contract**: H.264 high profile @ 30fps CFR, AAC stereo (configurable)
+- **Error classification**: Permanent vs transient for intelligent retry logic
+- **Artifact preservation**: Saves logs + reproducible scripts on failure
 - **Safe file handling**: Original inputs never overwritten; outputs written to new run folders
+
+See [docs/RENDERING.md](docs/RENDERING.md) for comprehensive rendering documentation.
 
 ### Performance Characteristics
 
@@ -689,30 +700,40 @@ poetry export -f requirements.txt --without-hashes -o requirements.txt
 - ✅ CLI commands: `process`, `queue status`, `queue retry`, `queue clear` - Evidence: [cli.py](src/content_ai/cli.py)
 
 **Testing & CI:**
-- ✅ 79 unit tests across 6 test files (46% coverage) - Evidence: [tests/](tests/)
+
+- ✅ 123 unit tests across 8 test files (55% coverage) - Evidence: [tests/](tests/)
 - ✅ GitHub Actions CI with Poetry caching - Evidence: [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
-### Next Milestone: Robust Rendering Enhancements
+**Robust Rendering:**
 
-**Goal:** Strengthen rendering stability, add parallel clip extraction, and support additional output formats.
+- ✅ FfmpegRunner with process isolation - Evidence: [ffmpeg_runner.py](src/content_ai/ffmpeg_runner.py)
+- ✅ Dual timeout enforcement (global + no-progress) - Evidence: 30 min global, 2 min stall detection
+- ✅ VFR detection and CFR normalization - Evidence: [renderer.py](src/content_ai/renderer.py) `probe_video()`, `should_use_fast_path()`
+- ✅ Render contract for consistent output - Evidence: [models.py](src/content_ai/models.py) `RenderContractConfig`
+- ✅ Error classification for retry logic - Evidence: [ffmpeg_runner.py](src/content_ai/ffmpeg_runner.py) `FfmpegErrorType`
+- ✅ Artifact preservation on failure - Evidence: Saves logs + reproducible scripts
+
+### Next Milestone: Output Format Support 🚧
+
+**Status:** Not Started
+
+**Goal:** Add WebM and other output format support.
 
 **Acceptance Criteria:**
-1. Parallel clip rendering using ProcessPoolExecutor (maintain temp file isolation via job_id/pid naming)
-2. Add WebM output format support (VP9 video, Opus audio) with CLI flag `--format webm`
-3. Verify output file integrity (checksum validation before marking job succeeded)
-4. Add rendering timeout per clip (configurable, default 300s) to prevent hung ffmpeg processes
-5. Implement graceful degradation: if montage assembly fails, preserve individual clips
-6. Add detailed rendering metrics to run_meta.json (render time per clip, total encoding time, codec info)
+
+1. Add WebM output format support (VP9 video, Opus audio) with CLI flag `--format webm`
+2. Verify output file integrity (checksum validation before marking job succeeded)
+3. Add detailed rendering metrics to run_meta.json (render time per clip, total encoding time, codec info)
 
 **Modules to Touch:**
-- [renderer.py](src/content_ai/renderer.py) - Add parallel rendering, WebM support, timeout handling
-- [pipeline.py](src/content_ai/pipeline.py) - Replace sequential clip rendering loop with parallel executor
+
+- [renderer.py](src/content_ai/renderer.py) - Add WebM contract support
 - [models.py](src/content_ai/models.py) - Add output_format field to OutputConfig
 - [cli.py](src/content_ai/cli.py) - Add `--format` flag
 
 **Guardrails:**
+
 - Maintain determinism (same inputs → same outputs for same format)
-- Temp file naming must prevent collisions in parallel execution
 - Test with diverse videos (high/low motion, different resolutions)
 - No silent failures (all FFmpeg errors must be caught and raised)
 
