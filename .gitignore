@@ -32,10 +32,22 @@ cache/
 
 # Output and renders (ignore heavy media exports and intermediates)
 output/
+outputs/
 exports/
 renders/
 montage/
 clips/
+
+# Backend Data
+content_ai.db
+uploads/
+tools/
+
+# Web App
+web/node_modules/
+web/.next/
+web/out/
+web/.env.local
 
 # Intermediates
 *.wav

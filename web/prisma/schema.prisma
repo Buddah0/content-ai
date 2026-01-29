@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../../content_ai.db"
+}
+
+model Asset {
+  id        String   @id @default(uuid())
+  filename  String
+  path      String // Local path on disk (since we are creating a vertical slice local app)
+  createdAt DateTime @default(now())
+  jobs      Job[]
+}
+
+model Job {
+  id        String    @id @default(uuid())
+  status    String    @default("PENDING")
+  progress  Int       @default(0) // 0-100
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  assetId   String
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  segments  Segment[]
+  outputs   Output[]
+}
+
+model Segment {
+  id        String @id @default(uuid())
+  startTime Float
+  endTime   Float
+  score     Float
+  label     String?
+  
+  jobId     String
+  job       Job    @relation(fields: [jobId], references: [id])
+}
+
+model Output {
+  id        String @id @default(uuid())
+  path      String
+  type      String // "16:9" or "9:16"
+  
+  jobId     String
+  job       Job    @relation(fields: [jobId], references: [id])
+}
