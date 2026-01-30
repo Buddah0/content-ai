@@ -29,6 +29,7 @@ class Job(Base):
     createdAt = Column(DateTime, default=datetime.utcnow)
     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     assetId = Column(String, ForeignKey("Asset.id"))
+    settings = Column(String, nullable=True) # JSON string of settings used
 
 class Segment(Base):
     __tablename__ = "Segment"

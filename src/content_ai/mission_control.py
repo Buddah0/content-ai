@@ -167,27 +167,33 @@ def render_9_16(source_path: str, output_path: str, user_config: Dict):
     print(f"Rendering 9:16: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
-def run_mission_control_pipeline(video_path: str, job_id: str, output_dir: str):
+def run_mission_control_pipeline(video_path: str, job_id: str, output_dir: str, user_config: Dict = None):
     """
     Main entry point for the job.
     1. Detect
     2. Segments -> Concat
     3. Generate Outputs
     """
+    if user_config is None:
+        user_config = {}
+
     # 1. Detect
+    # Merge user_config with internal defaults
+    rms_threshold = user_config.get("rmsThreshold", 0.1)
+    min_event_duration = user_config.get("minEventDuration", 0.5)
+    context_padding = user_config.get("contextPadding", 0.5)
+    merge_gap = user_config.get("mergeGap", 1.0)
+    max_segment_duration = user_config.get("maxSegmentDuration", 10.0)
+
     config = {
-        "detection": {"rms_threshold": 0.1, "min_event_duration_s": 0.5},
-        "processing": {"min_event_duration_s": 0.5} # etc
+        "detection": {"rms_threshold": rms_threshold, "min_event_duration_s": min_event_duration},
+        "processing": {"min_event_duration_s": min_event_duration}
     }
     raw_events = detect_hype(video_path, config)
     
     # Merge/Process
-    # Using defaults for now
-    segments = raw_events # In real pipeline we merge/pad
-    segments = pad_segments(segments, 0.5)
-    segments = merge_segments(segments, 1.0, 10.0)
-    # clamp
-    # filter
+    segments = pad_segments(raw_events, context_padding)
+    segments = merge_segments(segments, merge_gap, max_segment_duration)
     
     # 2. Render Segments
     segment_files = []
@@ -207,15 +213,15 @@ def run_mission_control_pipeline(video_path: str, job_id: str, output_dir: str):
     build_montage_from_list(segment_files, concat_path)
     
     # Mock Captions
-    ass_path = "captions.ass" # Working dir
+    ass_path = os.path.join(output_dir, "captions.ass") # Use output_dir to avoid conflicts
     generate_ass_captions(segments, ass_path)
     
     # 3. Outputs
     out_16_9 = os.path.join(output_dir, "output_16_9.mp4")
-    render_16_9(concat_path, out_16_9, {})
+    render_16_9(concat_path, out_16_9, user_config)
     
     out_9_16 = os.path.join(output_dir, "output_9_16.mp4")
-    render_9_16(concat_path, out_9_16, {})
+    render_9_16(concat_path, out_9_16, user_config)
     
     return [out_16_9, out_9_16], segments
 

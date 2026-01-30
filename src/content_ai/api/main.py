@@ -54,14 +54,14 @@ class JobResponse(BaseModel):
 # --- MOCK PROCESSING TASK ---
 from content_ai.mission_control import run_mission_control_pipeline
 
-async def process_job_task(job_id: str):
+async def process_job_task(job_id: str, settings: dict = None):
     """
     Real processing task that runs the mission control pipeline.
     """
-    print(f"Starting job {job_id}")
+    print(f"Starting job {job_id} with settings: {settings}")
     
     try:
-        # Get Job and Asset
+        # Get Asset
         query = select(Job).where(Job.id == job_id)
         job = await database.fetch_one(query)
         if not job:
@@ -70,7 +70,7 @@ async def process_job_task(job_id: str):
         query_asset = select(Asset).where(Asset.id == job.assetId)
         asset = await database.fetch_one(query_asset)
         if not asset:
-            return # Should handle error
+            return
 
         # 1. Update status to PROCESSING
         query = update(Job).where(Job.id == job_id).values(status=JobStatus.PROCESSING, progress=0, updatedAt=datetime.utcnow())
@@ -80,16 +80,10 @@ async def process_job_task(job_id: str):
         output_dir = os.path.join(os.getcwd(), "outputs", job_id)
         os.makedirs(output_dir, exist_ok=True)
         
-        # Run Pipeline (Blocking)
-        # We can implement progress callbacks later, for now just run it
-        # Note: This runs the WHOLE pipeline. Progress updates via database are harder without a callback.
-        # But for MVP we can rely on steps.
-        
         await database.execute(update(Job).where(Job.id == job_id).values(progress=10, updatedAt=datetime.utcnow()))
 
         # Run in thread
-        # returns [out_16_9, out_9_16], segments
-        outputs, segments = await asyncio.to_thread(run_mission_control_pipeline, asset.path, job_id, output_dir)
+        outputs, segments = await asyncio.to_thread(run_mission_control_pipeline, asset.path, job_id, output_dir, settings)
         
         await database.execute(update(Job).where(Job.id == job_id).values(progress=90, updatedAt=datetime.utcnow()))
 
@@ -137,6 +131,22 @@ async def root():
 async def health_check():
     return {"status": "ok"}
 
+@app.get("/jobs")
+async def list_jobs():
+    """List all jobs, most recent first."""
+    query = select(Job).order_by(Job.createdAt.desc())
+    jobs = await database.fetch_all(query)
+    return [
+        {
+            "id": job.id,
+            "status": job.status.value if hasattr(job.status, 'value') else job.status,
+            "progress": job.progress,
+            "createdAt": job.createdAt.isoformat() if job.createdAt else None,
+            "assetId": job.assetId
+        }
+        for job in jobs
+    ]
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1]
@@ -165,9 +175,13 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=404, detail="Asset not found")
         
     # Create Job
+    import json
+    settings_json = json.dumps(job_data.settings) if job_data.settings else None
+
     query = insert(Job).values(
         id=job_id,
         assetId=job_data.assetId,
+        settings=settings_json,
         status=JobStatus.PENDING,
         progress=0,
         createdAt=datetime.utcnow(),
@@ -176,7 +190,7 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
     await database.execute(query)
     
     # Trigger Processing
-    background_tasks.add_task(process_job_task, job_id)
+    background_tasks.add_task(process_job_task, job_id, job_data.settings)
     
     return {"id": job_id, "status": "PENDING"}
 

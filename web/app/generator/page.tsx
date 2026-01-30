@@ -9,17 +9,41 @@ import { CheckCircle2, Play, Download, ArrowRight, Loader2, AlertCircle } from '
 
 const API_BASE = "http://localhost:8000";
 
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+
 type Step = 'upload' | 'settings' | 'processing' | 'result';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function GeneratorPage() {
+    const searchParams = useSearchParams();
     const [step, setStep] = useState<Step>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [assetId, setAssetId] = useState<string | null>(null);
-    const [jobId, setJobId] = useState<string | null>(null);
+    const [jobId, setJobId] = useState<string | null>(searchParams.get('jobId'));
     const [progress, setProgress] = useState(0);
     const [status, setStatus] = useState("PENDING");
     const [outputs, setOutputs] = useState<{ type: string, path: string }[]>([]);
     const [segments, setSegments] = useState<{ startTime: number, endTime: number }[]>([]);
+
+    // settings
+    const [settings, setSettings] = useState({
+        rmsThreshold: 0.1,
+        maxSegmentDuration: 10,
+        showCaptions: true,
+        showWatermark: true,
+    });
+
+    // If jobId is in URL, fetch results immediately
+    useEffect(() => {
+        const id = searchParams.get('jobId');
+        if (id) {
+            setJobId(id);
+            fetchResultsInternal(id);
+        }
+    }, [searchParams]);
 
     // 1. Upload
     const handleUpload = async () => {
@@ -52,7 +76,7 @@ export default function GeneratorPage() {
             const res = await fetch(`${API_BASE}/jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assetId })
+                body: JSON.stringify({ assetId, settings })
             });
             const data = await res.json();
             setJobId(data.id);
@@ -90,7 +114,12 @@ export default function GeneratorPage() {
 
     const fetchResults = async () => {
         if (!jobId) return;
-        const res = await fetch(`${API_BASE}/jobs/${jobId}`);
+        fetchResultsInternal(jobId);
+    };
+
+    const fetchResultsInternal = async (id: string) => {
+        const res = await fetch(`${API_BASE}/jobs/${id}`);
+        if (!res.ok) return;
         const data = await res.json();
         setOutputs(data.outputs);
         setSegments(data.segments);
@@ -128,30 +157,68 @@ export default function GeneratorPage() {
                         <CardTitle>Configuration</CardTitle>
                         <CardDescription>Customize your output generation.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="p-4 border rounded-lg bg-secondary/50">
-                                <h4 className="font-semibold mb-2">Captions</h4>
-                                <p className="text-sm text-muted-foreground">Burned-in mock captions enabled (Fixed)</p>
+                    <CardContent className="space-y-8">
+                        <div className="grid gap-8 md:grid-cols-2">
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <Label>Sensitivity (RMS Threshold)</Label>
+                                        <span className="text-xs text-muted-foreground">{settings.rmsThreshold.toFixed(2)}</span>
+                                    </div>
+                                    <Slider
+                                        value={[settings.rmsThreshold]}
+                                        min={0.01}
+                                        max={0.5}
+                                        step={0.01}
+                                        onValueChange={([val]) => setSettings({ ...settings, rmsThreshold: val })}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Lower = more events, Higher = only loud peaks.</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <Label>Max Clip Duration (s)</Label>
+                                        <span className="text-xs text-muted-foreground">{settings.maxSegmentDuration}s</span>
+                                    </div>
+                                    <Slider
+                                        value={[settings.maxSegmentDuration]}
+                                        min={2}
+                                        max={30}
+                                        step={1}
+                                        onValueChange={([val]) => setSettings({ ...settings, maxSegmentDuration: val })}
+                                    />
+                                </div>
                             </div>
-                            <div className="p-4 border rounded-lg bg-secondary/50">
-                                <h4 className="font-semibold mb-2">Watermark</h4>
-                                <p className="text-sm text-muted-foreground">LOUD watermark (Top-Left) enabled (Fixed)</p>
-                            </div>
-                            <div className="p-4 border rounded-lg bg-secondary/50">
-                                <h4 className="font-semibold mb-2">Output Formats</h4>
-                                <p className="text-sm text-muted-foreground">Generating BOTH 9:16 and 16:9</p>
-                            </div>
-                            <div className="p-4 border rounded-lg bg-secondary/50">
-                                <h4 className="font-semibold mb-2">Framing</h4>
-                                <p className="text-sm text-muted-foreground">9:16 uses Blur + Pad (Creator-Ready)</p>
+
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/20">
+                                    <div className="space-y-0.5">
+                                        <Label>Burn-in Captions</Label>
+                                        <p className="text-[10px] text-muted-foreground">Add "HYPE!" labels to recognized events.</p>
+                                    </div>
+                                    <Switch
+                                        checked={settings.showCaptions}
+                                        onCheckedChange={(checked) => setSettings({ ...settings, showCaptions: checked })}
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/20">
+                                    <div className="space-y-0.5">
+                                        <Label>Watermark</Label>
+                                        <p className="text-[10px] text-muted-foreground">Apply the "LOUD" branding overlay.</p>
+                                    </div>
+                                    <Switch
+                                        checked={settings.showWatermark}
+                                        onCheckedChange={(checked) => setSettings({ ...settings, showWatermark: checked })}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                     <div className="p-6 pt-0 flex justify-between">
                         <Button variant="ghost" onClick={() => setStep('upload')}>Back</Button>
                         <Button size="lg" onClick={handleStartJob} disabled={!assetId}>
-                            {assetId ? "Generate Highlights" : "Uploading..."}
+                            Generate Highlights
                         </Button>
                     </div>
                 </Card>

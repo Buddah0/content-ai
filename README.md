@@ -9,6 +9,7 @@
 - **Batch Processing**: Recursively scans folders to process multiple videos in a single run
 - **Job Queue System**: Resumable batch processing with crash recovery, dirty detection, and parallel execution
 - **Robust Rendering**: ✨ **COMPLETE** - Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
+- **Mission Control Web UI**: ✨ **COMPLETE** - Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
 - **Fully Configurable**: YAML-based configuration with CLI flag overrides and Pydantic validation
 - **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
 - **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
@@ -18,84 +19,69 @@
 ### Requirements
 
 - **Python**: 3.11 or higher
-- **FFmpeg**: Must be available on your system (or `imageio-ffmpeg` will be used as fallback on Windows/WSL)
+- **Node.js**: 18+ (for Web UI)
+- **FFmpeg**: Must be available on your system
 
-### Method 1: Poetry (Recommended)
-
-Poetry is the source of truth for dependencies. `requirements.txt` is auto-generated for pip compatibility.
-
-```bash
-# Install Poetry
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
-poetry install
-
-# Verify installation
-poetry run content-ai check
-```
-
-### Method 2: pip (Alternative)
+### 1. Backend Setup
 
 ```bash
-# Create virtual environment
+# Create and activate venv
 python -m venv venv
-
-# Activate environment
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
 source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Verify installation
-python -m content_ai check
 ```
 
-## Quick Start
-
-### One-Command Demo
-
-Zero-friction validation that the entire pipeline works end-to-end:
+### 2. Web UI Setup
 
 ```bash
-# With Poetry
-poetry run content-ai scan --demo
-
-# With pip
-python -m content_ai scan --demo
+cd web
+yarn install
+# Initialize Database
+npx prisma generate
 ```
 
-This command:
-- Auto-generates a synthetic demo video with percussive audio spikes (on first run)
-- Detects events using HPSS + RMS analysis
-- Applies Smart Merging with configurable parameters
-- Outputs `demo_output.mp4` in the repo root
-- Prints a detailed run summary
-- Exits with code 0 on success
+## Running Mission Control
 
-**Expected output:**
+You need both the backend and frontend running for the full experience.
 
+### 1. Start Backend (FastAPI)
+```bash
+./venv/bin/python -m uvicorn content_ai.api.main:app --app-dir src --reload --port 8000
 ```
---- 🎬 DEMO MODE ---
-Using demo asset: /path/to/assets/demo/sample.mp4
-...
-============================================================
-RUN SUMMARY
-============================================================
-Files scanned:        1
-Events detected:      X
-Segments selected:    Y
-Total duration:       Z.XXs
-Output path:          /path/to/demo_output.mp4
-============================================================
 
-✅ Demo complete! Check demo_output.mp4
+### 2. Start Frontend (Next.js)
+```bash
+cd web
+yarn dev
 ```
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
+
+## Roadmap
+
+### 1. Robust Rendering ✨ **DONE**
+- FFmpeg process isolation
+- Timeout enforcement
+- VFR to CFR normalization
+- Fallback logic for empty detection
+
+### 2. Mission Control Web UI ✨ **DONE**
+- Modern Next.js Dashboard
+- Real-time SSE Progress
+- Job History & Persistence
+- Deep-linking to results
+
+### 3. Fully Configurable 🚧 **IN PROGRESS**
+- YAML-based configuration
+- CLI flag overrides
+- Pydantic validation
+- Dynamic config injection into Web UI
+
+### 4. Output Format Support (WebM/VP9)
+### 5. TTS Narration Overlay
 
 ## Repo Tour (Folder Structure + Golden Path)
 
