@@ -4,14 +4,14 @@ Demo asset generation for the One-Command Promise.
 This module creates a synthetic demo video with percussive audio spikes
 for testing and demonstration purposes.
 """
+
 import os
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from moviepy.editor import (
-    ColorClip,
     AudioClip,
-    CompositeVideoClip,
-    concatenate_videoclips,
+    ColorClip,
 )
 
 

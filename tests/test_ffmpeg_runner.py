@@ -3,15 +3,11 @@
 import os
 import subprocess
 import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from content_ai.ffmpeg_runner import (
-    FfmpegRunner,
-    FfmpegProgress,
-    FfmpegResult,
-    FfmpegErrorType
-)
+
+from content_ai.ffmpeg_runner import FfmpegErrorType, FfmpegProgress, FfmpegResult, FfmpegRunner
 
 
 class TestProgressParsing:
@@ -23,12 +19,7 @@ class TestProgressParsing:
         runner._progress = FfmpegProgress()
 
         # Simulate FFmpeg progress line
-        mock_stderr = [
-            "frame=  123\n",
-            "fps=25.00\n",
-            "out_time=00:00:05.50\n",
-            "speed=2.5x\n"
-        ]
+        mock_stderr = ["frame=  123\n", "fps=25.00\n", "out_time=00:00:05.50\n", "speed=2.5x\n"]
 
         # Mock the stderr stream
         runner._monitor_progress(iter(mock_stderr))
@@ -44,9 +35,7 @@ class TestProgressParsing:
         runner = FfmpegRunner()
         runner._progress = FfmpegProgress()
 
-        mock_stderr = [
-            "out_time=01:23:45.67\n"
-        ]
+        mock_stderr = ["out_time=01:23:45.67\n"]
 
         runner._monitor_progress(iter(mock_stderr))
 
@@ -65,14 +54,10 @@ class TestProgressParsing:
         runner._progress = FfmpegProgress()
 
         # Simulate multiple progress updates with time gaps
-        mock_stderr = [
-            "out_time=00:00:01.00\n",
-            "out_time=00:00:02.00\n",
-            "out_time=00:00:03.00\n"
-        ]
+        mock_stderr = ["out_time=00:00:01.00\n", "out_time=00:00:02.00\n", "out_time=00:00:03.00\n"]
 
         # Patch time.time to control callback timing
-        with patch('time.time') as mock_time:
+        with patch("time.time") as mock_time:
             # First progress update at t=0
             mock_time.return_value = 0.0
             runner._monitor_progress(iter([mock_stderr[0]]))
@@ -98,13 +83,12 @@ class TestErrorClassification:
             "Invalid data found when processing input",
             "Permission denied",
             "Unsupported codec for output stream",
-            "moov atom not found"
+            "moov atom not found",
         ]
 
         for stderr in permanent_cases:
             error_type = runner._classify_error(stderr)
-            assert error_type == FfmpegErrorType.PERMANENT, \
-                f"Expected PERMANENT for: {stderr}"
+            assert error_type == FfmpegErrorType.PERMANENT, f"Expected PERMANENT for: {stderr}"
 
     def test_classify_transient_errors(self):
         """Test that transient errors are classified correctly."""
@@ -116,13 +100,12 @@ class TestErrorClassification:
             "Connection refused",
             "Connection timeout",
             "Resource temporarily unavailable",
-            "Disk full"
+            "Disk full",
         ]
 
         for stderr in transient_cases:
             error_type = runner._classify_error(stderr)
-            assert error_type == FfmpegErrorType.TRANSIENT, \
-                f"Expected TRANSIENT for: {stderr}"
+            assert error_type == FfmpegErrorType.TRANSIENT, f"Expected TRANSIENT for: {stderr}"
 
     def test_classify_unknown_as_transient(self):
         """Test that unknown errors default to transient."""
@@ -149,21 +132,14 @@ class TestCommandGeneration:
             def mock_run_ffmpeg(cmd, expected_duration=None):
                 captured_cmd.append(cmd)
                 return FfmpegResult(
-                    success=True,
-                    returncode=0,
-                    stdout="",
-                    stderr="",
-                    duration_s=1.0
+                    success=True, returncode=0, stdout="", stderr="", duration_s=1.0
                 )
 
             runner._run_ffmpeg = mock_run_ffmpeg
 
             # Extract segment
             runner.extract_segment(
-                source_path="input.mp4",
-                start=10.0,
-                end=20.0,
-                output_path="output.mp4"
+                source_path="input.mp4", start=10.0, end=20.0, output_path="output.mp4"
             )
 
             # Verify command structure
@@ -188,11 +164,7 @@ class TestCommandGeneration:
             def mock_run_ffmpeg(cmd, expected_duration=None):
                 captured_cmd.append(cmd)
                 return FfmpegResult(
-                    success=True,
-                    returncode=0,
-                    stdout="",
-                    stderr="",
-                    duration_s=1.0
+                    success=True, returncode=0, stdout="", stderr="", duration_s=1.0
                 )
 
             runner._run_ffmpeg = mock_run_ffmpeg
@@ -208,7 +180,7 @@ class TestCommandGeneration:
                 level="4.1",
                 pixel_format="yuv420p",
                 target_fps=30,
-                crf=23
+                crf=23,
             )
 
             cmd = captured_cmd[0]
@@ -237,11 +209,7 @@ class TestCommandGeneration:
             def mock_run_ffmpeg(cmd, expected_duration=None):
                 captured_cmd.append(cmd)
                 return FfmpegResult(
-                    success=True,
-                    returncode=0,
-                    stdout="",
-                    stderr="",
-                    duration_s=1.0
+                    success=True, returncode=0, stdout="", stderr="", duration_s=1.0
                 )
 
             runner._run_ffmpeg = mock_run_ffmpeg
@@ -268,10 +236,7 @@ class TestArtifactGeneration:
     def test_save_failure_artifacts(self):
         """Test that failure artifacts are saved correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            runner = FfmpegRunner(
-                temp_dir=tmpdir,
-                save_artifacts_on_failure=True
-            )
+            runner = FfmpegRunner(temp_dir=tmpdir, save_artifacts_on_failure=True)
 
             cmd = ["ffmpeg", "-i", "input.mp4", "output.mp4"]
             stdout = "FFmpeg output"
@@ -340,7 +305,7 @@ class TestProcessTreeCleanup:
     def test_kill_process_tree_with_psutil(self):
         """Test process tree kill with psutil available."""
         # Skip if psutil not installed (optional dependency)
-        psutil = pytest.importorskip("psutil")
+        pytest.importorskip("psutil")
 
         runner = FfmpegRunner()
 
@@ -354,12 +319,12 @@ class TestProcessTreeCleanup:
         mock_child1 = MagicMock()
         mock_child2 = MagicMock()
 
-        with patch('psutil.Process') as mock_process_class:
+        with patch("psutil.Process") as mock_process_class:
             mock_process_class.return_value = mock_parent
             mock_parent.children.return_value = [mock_child1, mock_child2]
 
             # Mock wait_procs
-            with patch('psutil.wait_procs') as mock_wait:
+            with patch("psutil.wait_procs") as mock_wait:
                 mock_wait.return_value = ([mock_parent], [])  # All processes terminated
 
                 stdout, stderr = runner._kill_process_tree()
@@ -381,10 +346,10 @@ class TestProcessTreeCleanup:
         mock_process.stderr = None
 
         # Mock psutil import failure
-        with patch('builtins.__import__', side_effect=ImportError):
-            with patch('os.name', 'posix'):
-                with patch('os.killpg') as mock_killpg:
-                    with patch('os.getpgid', return_value=12345):
+        with patch("builtins.__import__", side_effect=ImportError):
+            with patch("os.name", "posix"):
+                with patch("os.killpg") as mock_killpg:
+                    with patch("os.getpgid", return_value=12345):
                         mock_process.wait.side_effect = subprocess.TimeoutExpired("cmd", 5)
 
                         runner._kill_process_tree()
@@ -422,7 +387,7 @@ class TestConfigValidation:
             pixel_format="yuv420p",
             target_fps=30,
             crf=23,
-            preset="medium"
+            preset="medium",
         )
 
         assert config.codec == "libx264"
@@ -438,7 +403,7 @@ class TestConfigValidation:
 
         config = ContentAIConfig()
 
-        assert hasattr(config, 'rendering')
+        assert hasattr(config, "rendering")
         assert config.rendering is not None
         assert config.rendering.global_timeout_s == 1800
 
@@ -446,7 +411,7 @@ class TestConfigValidation:
 class TestIntegration:
     """Integration tests with mocked FFmpeg."""
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_extract_segment_success(self, mock_popen):
         """Test successful segment extraction."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -463,17 +428,14 @@ class TestIntegration:
             mock_popen.return_value = mock_process
 
             result = runner.extract_segment(
-                source_path="input.mp4",
-                start=5.0,
-                end=10.0,
-                output_path="output.mp4"
+                source_path="input.mp4", start=5.0, end=10.0, output_path="output.mp4"
             )
 
             assert result.success is True
             assert result.returncode == 0
             assert result.error_type is None
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_extract_segment_failure(self, mock_popen):
         """Test segment extraction failure."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -490,10 +452,7 @@ class TestIntegration:
             mock_popen.return_value = mock_process
 
             result = runner.extract_segment(
-                source_path="nonexistent.mp4",
-                start=0.0,
-                end=10.0,
-                output_path="output.mp4"
+                source_path="nonexistent.mp4", start=0.0, end=10.0, output_path="output.mp4"
             )
 
             assert result.success is False

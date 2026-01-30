@@ -1,6 +1,7 @@
+from unittest.mock import patch
+
 import pytest
-import sys
-from unittest.mock import patch, MagicMock
+
 from content_ai.cli import main
 
 

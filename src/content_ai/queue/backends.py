@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Abstract base classes for queue backends and manifest storage.
 
 This module defines the interfaces for queue operations, manifest storage,
@@ -7,8 +9,10 @@ migration to Redis/Celery/Taskiq.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from .models import JobItem, JobResult
 
 
 class QueueBackend(ABC):
@@ -251,7 +255,7 @@ class WorkerPool(ABC):
     """
 
     @abstractmethod
-    def submit(self, fn: callable, *args, **kwargs) -> Any:
+    def submit(self, fn: Callable, *args, **kwargs) -> Any:
         """Submit task to worker pool.
 
         Args:
@@ -265,7 +269,7 @@ class WorkerPool(ABC):
         pass
 
     @abstractmethod
-    def map(self, fn: callable, items: List[Any]) -> List[Any]:
+    def map(self, fn: Callable, items: List[Any]) -> List[Any]:
         """Parallel map with progress tracking.
 
         Args:

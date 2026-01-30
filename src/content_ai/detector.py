@@ -1,9 +1,8 @@
-import librosa
-import numpy as np
 import os
+from typing import Any, Dict, List
+
+import librosa
 from moviepy.editor import VideoFileClip
-from typing import List, Dict, Any, Tuple
-from pathlib import Path
 
 
 def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -100,5 +99,5 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
         if os.path.exists(temp_audio):
             try:
                 os.remove(temp_audio)
-            except:
+            except Exception:
                 pass

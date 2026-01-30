@@ -1,20 +1,25 @@
-import os
+from __future__ import annotations
+
 import json
+import os
 import subprocess
-from pathlib import Path
-from moviepy.editor import VideoFileClip
-from typing import List, Optional, Callable
 from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, List, Optional
+
+if TYPE_CHECKING:
+    from .ffmpeg_runner import FfmpegProgress, FfmpegResult
+    from .models import RenderingConfig
+
 import imageio_ffmpeg
+from moviepy.editor import VideoFileClip
 
 
 def get_ffmpeg_cmd():
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def render_segment_to_file(
-    source_path: str, start: float, end: float, output_path: str
-):
+def render_segment_to_file(source_path: str, start: float, end: float, output_path: str):
     """
     Render a single segment to a temporary file.
     """
@@ -77,10 +82,8 @@ def build_montage_from_list(segment_files: List[str], output_file: str):
             output_file,
         ]
 
-        print(f"Running ffmpeg concat...")
-        subprocess.run(
-            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-        )
+        print("Running ffmpeg concat...")
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     except subprocess.CalledProcessError as e:
         print(f"FFMPEG Error: {e.stderr.decode() if e.stderr else 'Unknown'}")
@@ -120,7 +123,7 @@ def render_segment_with_runner(
     end: float,
     output_path: str,
     rendering_config: Optional["RenderingConfig"] = None,
-    progress_callback: Optional[Callable[["FfmpegProgress"], None]] = None
+    progress_callback: Optional[Callable[["FfmpegProgress"], None]] = None,
 ) -> "FfmpegResult":
     """Render a segment using FfmpegRunner with full timeout/progress support.
 
@@ -159,7 +162,7 @@ def render_segment_with_runner(
         ... else:
         ...     print(f"Error: {result.error_type}")
     """
-    from .ffmpeg_runner import FfmpegRunner, FfmpegProgress, FfmpegResult
+    from .ffmpeg_runner import FfmpegRunner
     from .models import RenderingConfig
 
     # Use defaults if no config provided
@@ -174,13 +177,13 @@ def render_segment_with_runner(
         try:
             source_metadata = probe_video(
                 source_path,
-                frame_rate_tolerance=rendering_config.vfr_detection.frame_rate_tolerance
+                frame_rate_tolerance=rendering_config.vfr_detection.frame_rate_tolerance,
             )
             use_fast_path = should_use_fast_path(
                 source_metadata,
                 normalize_to_contract=rendering_config.normalize_to_contract,
                 force_cfr=rendering_config.force_cfr,
-                fast_path_enabled=rendering_config.fast_path_enabled
+                fast_path_enabled=rendering_config.fast_path_enabled,
             )
         except RuntimeError as e:
             # If probe fails, fall back to full re-encode for safety
@@ -196,7 +199,7 @@ def render_segment_with_runner(
         save_artifacts_on_failure=rendering_config.save_artifacts_on_failure,
         ffmpeg_loglevel=rendering_config.ffmpeg_loglevel,
         temp_dir=rendering_config.temp_dir,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
     )
 
     # Get contract settings
@@ -216,7 +219,7 @@ def render_segment_with_runner(
             output_path=output_path,
             codec="copy",  # Stream copy for fast path
             preset="medium",  # Ignored for copy
-            audio_codec="copy"  # Stream copy audio too
+            audio_codec="copy",  # Stream copy audio too
         )
     else:
         # Full re-encode to contract specs
@@ -232,7 +235,7 @@ def render_segment_with_runner(
             level=video_config.level,
             pixel_format=video_config.pixel_format,
             target_fps=video_config.target_fps if rendering_config.force_cfr else None,
-            crf=video_config.crf
+            crf=video_config.crf,
         )
 
 
@@ -240,7 +243,7 @@ def concat_with_runner(
     segment_files: List[str],
     output_path: str,
     rendering_config: Optional["RenderingConfig"] = None,
-    progress_callback: Optional[Callable[["FfmpegProgress"], None]] = None
+    progress_callback: Optional[Callable[["FfmpegProgress"], None]] = None,
 ) -> "FfmpegResult":
     """Concatenate segments using FfmpegRunner with validation.
 
@@ -265,7 +268,7 @@ def concat_with_runner(
         >>> if result.success:
         ...     print(f"Created montage at {output_path}")
     """
-    from .ffmpeg_runner import FfmpegRunner, FfmpegProgress, FfmpegResult
+    from .ffmpeg_runner import FfmpegResult, FfmpegRunner
     from .models import RenderingConfig
 
     if not segment_files:
@@ -275,7 +278,7 @@ def concat_with_runner(
             returncode=0,
             stdout="",
             stderr="No segments to concatenate",
-            duration_s=0.0
+            duration_s=0.0,
         )
 
     # Use defaults if no config provided
@@ -287,7 +290,7 @@ def concat_with_runner(
         try:
             compatible = validate_segment_compatibility(
                 segment_files,
-                frame_rate_tolerance=rendering_config.vfr_detection.frame_rate_tolerance
+                frame_rate_tolerance=rendering_config.vfr_detection.frame_rate_tolerance,
             )
             if not compatible:
                 print("Warning: Segments have incompatible specs. Proceeding with concat anyway.")
@@ -303,7 +306,7 @@ def concat_with_runner(
         save_artifacts_on_failure=rendering_config.save_artifacts_on_failure,
         ffmpeg_loglevel=rendering_config.ffmpeg_loglevel,
         temp_dir=rendering_config.temp_dir,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
     )
 
     return runner.concat_videos(segment_files, output_path)
@@ -320,6 +323,7 @@ class VideoMetadata:
 
     Used for VFR detection, codec compatibility checking, and fast path decisions.
     """
+
     # Video stream info
     codec_name: str
     profile: Optional[str]
@@ -329,10 +333,10 @@ class VideoMetadata:
     height: int
 
     # Frame rate info
-    r_frame_rate: str           # Container/declared frame rate (e.g., "60/1")
-    avg_frame_rate: str         # Actual average frame rate (e.g., "1349280/22481")
-    is_vfr: bool                # True if avg != r_frame_rate (within tolerance)
-    fps_numeric: float          # Numeric fps for easy comparison
+    r_frame_rate: str  # Container/declared frame rate (e.g., "60/1")
+    avg_frame_rate: str  # Actual average frame rate (e.g., "1349280/22481")
+    is_vfr: bool  # True if avg != r_frame_rate (within tolerance)
+    fps_numeric: float  # Numeric fps for easy comparison
 
     # Audio stream info
     audio_codec: Optional[str]
@@ -369,11 +373,13 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
 
     cmd = [
         ffprobe_exe,
-        "-v", "quiet",
-        "-print_format", "json",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
         "-show_format",
         "-show_streams",
-        video_path
+        video_path,
     ]
 
     try:
@@ -382,7 +388,7 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
             capture_output=True,
             check=True,
             text=True,
-            timeout=30  # ffprobe should be fast
+            timeout=30,  # ffprobe should be fast
         )
         data = json.loads(result.stdout)
     except subprocess.CalledProcessError as e:
@@ -390,7 +396,7 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
     except json.JSONDecodeError as e:
         raise RuntimeError(f"ffprobe output parsing failed: {e}")
     except subprocess.TimeoutExpired:
-        raise RuntimeError(f"ffprobe timed out after 30s")
+        raise RuntimeError("ffprobe timed out after 30s")
 
     # Find video and audio streams
     video_stream = None
@@ -415,7 +421,7 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
         try:
             num, denom = rate_str.split("/")
             return float(num) / float(denom) if float(denom) != 0 else 0.0
-        except:
+        except Exception:
             return 0.0
 
     r_fps = fraction_to_float(r_frame_rate)
@@ -454,7 +460,7 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
         audio_sample_rate=audio_sample_rate,
         audio_channels=audio_channels,
         duration=duration,
-        bitrate=bitrate
+        bitrate=bitrate,
     )
 
 
@@ -462,7 +468,7 @@ def should_use_fast_path(
     source_metadata: VideoMetadata,
     normalize_to_contract: bool = False,
     force_cfr: bool = True,
-    fast_path_enabled: bool = True
+    fast_path_enabled: bool = True,
 ) -> bool:
     """Determine if fast path (-c copy) can be used for extraction.
 
@@ -503,8 +509,7 @@ def should_use_fast_path(
 
 
 def validate_segment_compatibility(
-    segment_paths: List[str],
-    frame_rate_tolerance: float = 0.01
+    segment_paths: List[str], frame_rate_tolerance: float = 0.01
 ) -> bool:
     """Validate that all segments have identical codec/fps/audio specs.
 
@@ -543,7 +548,9 @@ def validate_segment_compatibility(
             return False
 
         if meta.pixel_format != reference.pixel_format:
-            print(f"Warning: Pixel format mismatch - {meta.pixel_format} vs {reference.pixel_format}")
+            print(
+                f"Warning: Pixel format mismatch - {meta.pixel_format} vs {reference.pixel_format}"
+            )
             return False
 
         if abs(meta.fps_numeric - reference.fps_numeric) > 0.01:
@@ -551,7 +558,7 @@ def validate_segment_compatibility(
             return False
 
         if meta.is_vfr or reference.is_vfr:
-            print(f"Warning: VFR detected in segments")
+            print("Warning: VFR detected in segments")
             return False
 
         if meta.audio_codec != reference.audio_codec:
@@ -559,7 +566,9 @@ def validate_segment_compatibility(
             return False
 
         if meta.audio_sample_rate != reference.audio_sample_rate:
-            print(f"Warning: Audio sample rate mismatch - {meta.audio_sample_rate} vs {reference.audio_sample_rate}")
+            print(
+                f"Warning: Audio sample rate mismatch - {meta.audio_sample_rate} vs {reference.audio_sample_rate}"
+            )
             return False
 
     return True

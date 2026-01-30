@@ -1,11 +1,9 @@
-import pytest
 from content_ai.segments import (
-    merge_segments,
     clamp_segments,
     filter_min_duration,
+    merge_segments,
     pad_segments,
 )
-
 
 # ============================================================================
 # Smart Merging Tests (with max_duration enforcement)

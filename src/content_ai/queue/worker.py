@@ -9,18 +9,19 @@ This module provides parallel video processing with:
 - Graceful shutdown handling
 """
 
+import multiprocessing
 import os
-import time
 import shutil
 import threading
+import time
 import traceback
-import multiprocessing
-from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Callable, List, Any, Optional, Dict
+from pathlib import Path
+from typing import Any, Callable, Dict, List
+
 from tqdm import tqdm
 
-from .backends import WorkerPool, QueueBackend
+from .backends import WorkerPool
 from .models import JobItem, JobResult, JobStatus
 
 
@@ -35,9 +36,9 @@ def _worker_init():
     import moviepy  # noqa
 
     # Set worker-specific temp directory
-    worker_tmp = f'/tmp/content_ai_worker_{os.getpid()}'
+    worker_tmp = f"/tmp/content_ai_worker_{os.getpid()}"
     os.makedirs(worker_tmp, exist_ok=True)
-    os.environ['TMPDIR'] = worker_tmp
+    os.environ["TMPDIR"] = worker_tmp
 
 
 class JobWorkerPool(WorkerPool):
@@ -67,10 +68,7 @@ class JobWorkerPool(WorkerPool):
 
     def __enter__(self):
         """Create worker pool on context entry."""
-        self._executor = ProcessPoolExecutor(
-            max_workers=self.n_workers,
-            initializer=_worker_init
-        )
+        self._executor = ProcessPoolExecutor(max_workers=self.n_workers, initializer=_worker_init)
         return self
 
     def __exit__(self, *args):
@@ -113,18 +111,12 @@ class JobWorkerPool(WorkerPool):
             raise RuntimeError("Worker pool not initialized (use with statement)")
 
         # Submit all jobs
-        futures = {
-            self._executor.submit(fn, item): item
-            for item in items
-        }
+        futures = {self._executor.submit(fn, item): item for item in items}
 
         # Collect results as they complete
         results = []
         for future in tqdm(
-            as_completed(futures),
-            total=len(items),
-            desc="Processing videos",
-            unit="video"
+            as_completed(futures), total=len(items), desc="Processing videos", unit="video"
         ):
             try:
                 result = future.result()
@@ -152,7 +144,7 @@ def process_video_job(
     config: Dict[str, Any],
     db_path: str,
     run_dir: Path,
-    use_ffmpeg_runner: bool = False
+    use_ffmpeg_runner: bool = False,
 ) -> JobResult:
     """Worker function: processes single video job.
 
@@ -182,10 +174,10 @@ def process_video_job(
     """
     # Recreate queue connection in worker process (SQLite connections can't be pickled)
     from .sqlite_backend import SQLiteManifest, SQLiteQueue
+
     manifest = SQLiteManifest(db_path)
     queue = SQLiteQueue(manifest)
 
-    worker_id = f"worker-{os.getpid()}"
     start_time = time.time()
 
     try:
@@ -217,8 +209,10 @@ def process_video_job(
 
         try:
             # Import processing modules (already loaded in worker init)
-            from .. import detector, segments as seg_mod, renderer
             import uuid
+
+            from .. import detector, renderer
+            from .. import segments as seg_mod
 
             # 1. Detection phase
             raw_segments = detector.detect_hype(str(video_path), config)
@@ -231,7 +225,7 @@ def process_video_job(
                     status=JobStatus.SUCCEEDED,
                     output_files=[],
                     duration_s=duration,
-                    metadata={"segments": []}
+                    metadata={"segments": []},
                 )
                 queue.ack_success(job.job_id, result)
                 return result
@@ -241,13 +235,14 @@ def process_video_job(
             pad_s = config["processing"]["context_padding_s"]
             merge_s = config["processing"]["merge_gap_s"]
             max_seg_dur = config["processing"].get("max_segment_duration_s", None)
-            min_dur = config["detection"]["min_event_duration_s"]
+            # min_dur = config["detection"]["min_event_duration_s"] # noqa: F841
 
             # Pad segments
             padded = seg_mod.pad_segments(raw_segments, pad_s)
 
             # Get video duration for clamping
             from moviepy.editor import VideoFileClip
+
             with VideoFileClip(str(video_path)) as clip:
                 video_duration = clip.duration
 
@@ -270,7 +265,7 @@ def process_video_job(
                     status=JobStatus.SUCCEEDED,
                     output_files=[],
                     duration_s=duration,
-                    metadata={"segments": []}
+                    metadata={"segments": []},
                 )
                 queue.ack_success(job.job_id, result)
                 return result
@@ -283,6 +278,7 @@ def process_video_job(
             rendering_config = None
             if use_ffmpeg_runner:
                 from ..models import RenderingConfig
+
                 rendering_config_dict = config.get("rendering", {})
                 rendering_config = RenderingConfig(**rendering_config_dict)
 
@@ -295,11 +291,11 @@ def process_video_job(
 
                     result = renderer.render_segment_with_runner(
                         source_path=str(video_path),
-                        start=segment['start'],
-                        end=segment['end'],
+                        start=segment["start"],
+                        end=segment["end"],
                         output_path=str(output_path),
                         rendering_config=rendering_config,
-                        progress_callback=None  # Could wire to heartbeat in future
+                        progress_callback=None,  # Could wire to heartbeat in future
                     )
 
                     if not result.success:
@@ -322,9 +318,9 @@ def process_video_job(
                     # Legacy MoviePy-based rendering
                     renderer.render_segment_to_file(
                         source_path=str(video_path),
-                        start=segment['start'],
-                        end=segment['end'],
-                        output_path=str(output_path)
+                        start=segment["start"],
+                        end=segment["end"],
+                        output_path=str(output_path),
                     )
 
                 output_files.append(str(output_path))
@@ -336,7 +332,7 @@ def process_video_job(
                 status=JobStatus.SUCCEEDED,
                 output_files=output_files,
                 duration_s=duration,
-                metadata={"segments": merged}
+                metadata={"segments": merged},
             )
             queue.ack_success(job.job_id, result)
             return result
@@ -351,10 +347,7 @@ def process_video_job(
         duration = time.time() - start_time
         queue.ack_fail(job.job_id, error_msg, retry=False)
         return JobResult(
-            job_id=job.job_id,
-            status=JobStatus.FAILED,
-            error_message=error_msg,
-            duration_s=duration
+            job_id=job.job_id, status=JobStatus.FAILED, error_message=error_msg, duration_s=duration
         )
 
     except PermissionError as e:
@@ -363,10 +356,7 @@ def process_video_job(
         duration = time.time() - start_time
         queue.ack_fail(job.job_id, error_msg, retry=False)
         return JobResult(
-            job_id=job.job_id,
-            status=JobStatus.FAILED,
-            error_message=error_msg,
-            duration_s=duration
+            job_id=job.job_id, status=JobStatus.FAILED, error_message=error_msg, duration_s=duration
         )
 
     except ValueError as e:
@@ -375,10 +365,7 @@ def process_video_job(
         duration = time.time() - start_time
         queue.ack_fail(job.job_id, error_msg, retry=False)
         return JobResult(
-            job_id=job.job_id,
-            status=JobStatus.FAILED,
-            error_message=error_msg,
-            duration_s=duration
+            job_id=job.job_id, status=JobStatus.FAILED, error_message=error_msg, duration_s=duration
         )
 
     except OSError as e:
@@ -397,10 +384,7 @@ def process_video_job(
         duration = time.time() - start_time
         queue.ack_fail(job.job_id, error_msg, retry=True)
         return JobResult(
-            job_id=job.job_id,
-            status=JobStatus.FAILED,
-            error_message=error_msg,
-            duration_s=duration
+            job_id=job.job_id, status=JobStatus.FAILED, error_message=error_msg, duration_s=duration
         )
 
     except Exception as e:
@@ -409,10 +393,7 @@ def process_video_job(
         duration = time.time() - start_time
         queue.ack_fail(job.job_id, error_msg, retry=True)
         return JobResult(
-            job_id=job.job_id,
-            status=JobStatus.FAILED,
-            error_message=error_msg,
-            duration_s=duration
+            job_id=job.job_id, status=JobStatus.FAILED, error_message=error_msg, duration_s=duration
         )
 
 
@@ -435,6 +416,7 @@ def _start_heartbeat(db_path: str, job_id: str):
     def heartbeat_loop():
         # Create thread-local queue connection
         from .sqlite_backend import SQLiteManifest, SQLiteQueue
+
         manifest = SQLiteManifest(db_path)
         queue = SQLiteQueue(manifest)
 

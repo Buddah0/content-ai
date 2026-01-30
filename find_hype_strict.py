@@ -1,5 +1,4 @@
 import librosa
-import numpy as np
 from moviepy import VideoFileClip
 
 
@@ -46,10 +45,8 @@ def analyze_volumes(video_path):
             if duration > 0.1:
                 segments.append((start_time, t, max_vol_in_segment))
 
-    print(f"\n--- 📊 VOLUME REPORT ---")
-    print(
-        f"Look at the 'Vol' number. We need to pick a number HIGHER than the Grenade line."
-    )
+    print("\n--- 📊 VOLUME REPORT ---")
+    print("Look at the 'Vol' number. We need to pick a number HIGHER than the Grenade line.")
     print("-" * 40)
 
     for start, end, vol in segments:

@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
-from content_ai.config import resolve_config, load_yaml, get_config_value
+
+from content_ai.config import get_config_value, load_yaml, resolve_config
 from content_ai.models import ContentAIConfig
 
 
@@ -56,11 +56,7 @@ def test_missing_yaml_returns_empty_dict():
 
 def test_multiple_cli_overrides():
     """Test multiple CLI overrides work together."""
-    config = resolve_config({
-        "rms_threshold": 0.15,
-        "max_duration": 60,
-        "order": "hybrid"
-    })
+    config = resolve_config({"rms_threshold": 0.15, "max_duration": 60, "order": "hybrid"})
     assert isinstance(config, ContentAIConfig)
     assert config.detection.rms_threshold == 0.15
     assert config.output.max_duration_s == 60

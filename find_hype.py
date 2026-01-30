@@ -48,7 +48,7 @@ def find_hype_moments(video_path, hype_threshold=3.0, min_duration=0.5):
             if duration >= min_duration:
                 segments.append((start_time, current_time))
 
-    print(f"\n--- 🔥 PERCUSSIVE HYPE REPORT ---")
+    print("\n--- 🔥 PERCUSSIVE HYPE REPORT ---")
     print(f"Found {len(segments)} action moments:")
     for start, end in segments:
         print(f"⏰ {start:.2f}s -> {end:.2f}s")

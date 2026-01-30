@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: content-ai-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: content_ai
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: content_ai_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
