@@ -22,25 +22,24 @@ Usage:
     stats = queued_pipeline.get_queue_stats(db_path="queue.db")
 """
 
-import os
 import json
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+import uuid
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from . import config as config_lib
 from . import scanner
 from .queue import (
-    SQLiteQueue,
-    SQLiteManifest,
-    JobWorkerPool,
-    process_video_job,
-    compute_input_hash,
-    compute_config_hash,
     JobItem,
     JobStatus,
+    JobWorkerPool,
+    SQLiteManifest,
+    SQLiteQueue,
+    compute_config_hash,
+    compute_input_hash,
+    process_video_job,
 )
-import uuid
 
 
 def enqueue_batch(
@@ -48,7 +47,7 @@ def enqueue_batch(
     config: Dict[str, Any],
     output_dir: str,
     db_path: str = "queue.db",
-    force: bool = False
+    force: bool = False,
 ) -> Dict[str, Any]:
     """Enqueue a batch of videos for processing.
 
@@ -82,12 +81,7 @@ def enqueue_batch(
     # Compute config hash once for entire batch
     config_hash = compute_config_hash(config)
 
-    stats = {
-        "enqueued": 0,
-        "cached": 0,
-        "failed_hash": 0,
-        "total": len(video_files)
-    }
+    stats = {"enqueued": 0, "cached": 0, "failed_hash": 0, "total": len(video_files)}
 
     print(f"Enqueueing {len(video_files)} videos...")
 
@@ -101,7 +95,7 @@ def enqueue_batch(
                 is_clean, reason = manifest.verify_hashes(
                     video_path=str(video_path),
                     config_hash=config_hash,
-                    input_hashes=input_hash_data
+                    input_hashes=input_hash_data,
                 )
 
                 if is_clean:
@@ -118,23 +112,20 @@ def enqueue_batch(
 
             # Convert config to dict if it's a Pydantic model
             config_dict = config
-            if hasattr(config, 'model_dump'):
+            if hasattr(config, "model_dump"):
                 config_dict = config.model_dump()
-            elif hasattr(config, 'dict'):
+            elif hasattr(config, "dict"):
                 config_dict = config.dict()
 
             job_item = JobItem(
                 job_id=job_id,
                 video_path=str(video_path),
-                input_hash_quick=input_hash_data['quick_hash'],
-                input_hash_full=input_hash_data['full_hash'],
-                input_size=input_hash_data['size'],
+                input_hash_quick=input_hash_data["quick_hash"],
+                input_hash_full=input_hash_data["full_hash"],
+                input_size=input_hash_data["size"],
                 config_hash=config_hash,
                 status=JobStatus.PENDING,
-                metadata={
-                    'config': config_dict,
-                    'output_dir': str(output_path)
-                }
+                metadata={"config": config_dict, "output_dir": str(output_path)},
             )
 
             # Enqueue job
@@ -148,14 +139,11 @@ def enqueue_batch(
             stats["failed_hash"] += 1
             continue
 
-
     return stats
 
 
 def process_queue(
-    db_path: str = "queue.db",
-    n_workers: int = None,
-    max_jobs: Optional[int] = None
+    db_path: str = "queue.db", n_workers: int = None, max_jobs: Optional[int] = None
 ) -> Dict[str, Any]:
     """Process jobs from the queue with parallel workers.
 
@@ -177,12 +165,7 @@ def process_queue(
     manifest = SQLiteManifest(db_path)
     queue = SQLiteQueue(manifest)
 
-    stats = {
-        "succeeded": 0,
-        "failed": 0,
-        "skipped": 0,
-        "total_duration": 0.0
-    }
+    stats = {"succeeded": 0, "failed": 0, "skipped": 0, "total_duration": 0.0}
 
     print(f"\nProcessing queue with {n_workers or 'auto'} workers...")
 
@@ -214,15 +197,13 @@ def process_queue(
             # Process in worker
             try:
                 result = pool.submit(
-                    process_video_job,
-                    job,
-                    config,
-                    db_path,
-                    Path(output_dir)
+                    process_video_job, job, config, db_path, Path(output_dir)
                 ).result()
 
                 # Update stats (status is already a string due to use_enum_values)
-                status_str = result.status if isinstance(result.status, str) else result.status.value
+                status_str = (
+                    result.status if isinstance(result.status, str) else result.status.value
+                )
                 if status_str == "succeeded":
                     stats["succeeded"] += 1
                     if not result.output_files:
@@ -242,7 +223,6 @@ def process_queue(
                 stats["failed"] += 1
                 processed += 1
                 continue
-
 
     return stats
 
@@ -275,7 +255,6 @@ def get_queue_stats(db_path: str = "queue.db") -> Dict[str, Any]:
     }
     stats["total"] = len(all_jobs)
 
-
     return stats
 
 
@@ -307,14 +286,13 @@ def retry_failed(db_path: str = "queue.db") -> int:
                     attempt_count = 0
                 WHERE job_id = ?
                 """,
-                (job["job_id"],)
+                (job["job_id"],),
             )
             manifest.db.conn.commit()
             count += 1
         except Exception as e:
             print(f"Failed to retry job {job['job_id']}: {e}")
             continue
-
 
     print(f"Marked {count} failed jobs for retry")
     return count
@@ -342,7 +320,6 @@ def clear_queue(db_path: str = "queue.db", clear_manifest: bool = False) -> None
         print("State transitions cleared")
 
 
-
 def run_queued_scan(cli_args: Dict[str, Any]) -> None:
     """Queue-based version of run_scan.
 
@@ -366,7 +343,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
     batch_dir = Path(output_base) / batch_name
     batch_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"--- 🚀 Starting Queued Pipeline ---")
+    print("--- 🚀 Starting Queued Pipeline ---")
     print(f"Batch directory: {batch_dir}")
 
     # 3. Scan
@@ -382,9 +359,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
         exts = [e.strip() for e in exts.split(",")]
 
     print(f"\nScanning {input_path}...")
-    video_files = scanner.scan_input(
-        input_path, recursive=recursive, limit=limit, extensions=exts
-    )
+    video_files = scanner.scan_input(input_path, recursive=recursive, limit=limit, extensions=exts)
     print(f"Found {len(video_files)} videos.")
 
     if not video_files:
@@ -400,7 +375,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
         config=conf,
         output_dir=str(batch_dir),
         db_path=db_path,
-        force=force
+        force=force,
     )
 
     print("\n" + "=" * 60)
@@ -420,10 +395,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
     # Process queue
     n_workers = cli_args.get("workers", None)
 
-    process_stats = process_queue(
-        db_path=db_path,
-        n_workers=n_workers
-    )
+    process_stats = process_queue(db_path=db_path, n_workers=n_workers)
 
     print("\n" + "=" * 60)
     print("PROCESSING SUMMARY")
@@ -437,9 +409,9 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
     # Save batch metadata
     # Convert config to dict if needed
     config_dict = conf
-    if hasattr(conf, 'model_dump'):
+    if hasattr(conf, "model_dump"):
         config_dict = conf.model_dump()
-    elif hasattr(conf, 'dict'):
+    elif hasattr(conf, "dict"):
         config_dict = conf.dict()
 
     batch_meta = {
@@ -448,7 +420,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
         "config": config_dict,
         "enqueue_stats": enqueue_stats,
         "process_stats": process_stats,
-        "cli_args": cli_args
+        "cli_args": cli_args,
     }
 
     with open(batch_dir / "batch_meta.json", "w") as f:

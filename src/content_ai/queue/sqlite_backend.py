@@ -8,12 +8,12 @@ This module provides the local-first, crash-safe queue implementation using:
 - Two-tier hashing for efficient dirty detection
 """
 
-import sqlite3
 import json
+import sqlite3
 import time
-from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from sqlite_utils import Database
@@ -23,10 +23,9 @@ except ImportError:
         "Install it with: pip install sqlite-utils"
     )
 
-from .backends import QueueBackend, ManifestStore
-from .models import JobItem, JobResult, JobStatus, StateTransition
+from .backends import ManifestStore, QueueBackend
 from .hashing import compute_output_hash
-
+from .models import JobItem, JobResult, JobStatus
 
 # SQLite schema SQL
 SCHEMA_SQL = """
@@ -134,10 +133,7 @@ class SQLiteManifest(ManifestStore):
 
         Complexity: O(log n) via video_path index
         """
-        rows = list(self.db["job_items"].rows_where(
-            "video_path = ?",
-            [str(video_path)]
-        ))
+        rows = list(self.db["job_items"].rows_where("video_path = ?", [str(video_path)]))
 
         if not rows:
             return None
@@ -145,20 +141,20 @@ class SQLiteManifest(ManifestStore):
         row = dict(rows[0])
 
         # Deserialize JSON fields
-        if row.get('output_files'):
-            row['output_files'] = json.loads(row['output_files'])
+        if row.get("output_files"):
+            row["output_files"] = json.loads(row["output_files"])
         else:
-            row['output_files'] = []
+            row["output_files"] = []
 
-        if row.get('output_hashes'):
-            row['output_hashes'] = json.loads(row['output_hashes'])
+        if row.get("output_hashes"):
+            row["output_hashes"] = json.loads(row["output_hashes"])
         else:
-            row['output_hashes'] = {}
+            row["output_hashes"] = {}
 
-        if row.get('metadata'):
-            row['metadata'] = json.loads(row['metadata'])
+        if row.get("metadata"):
+            row["metadata"] = json.loads(row["metadata"])
         else:
-            row['metadata'] = {}
+            row["metadata"] = {}
 
         return row
 
@@ -174,27 +170,24 @@ class SQLiteManifest(ManifestStore):
         # Serialize JSON fields
         state_copy = state.copy()
 
-        if 'output_files' in state_copy and isinstance(state_copy['output_files'], list):
-            state_copy['output_files'] = json.dumps(state_copy['output_files'])
+        if "output_files" in state_copy and isinstance(state_copy["output_files"], list):
+            state_copy["output_files"] = json.dumps(state_copy["output_files"])
 
-        if 'output_hashes' in state_copy and isinstance(state_copy['output_hashes'], dict):
-            state_copy['output_hashes'] = json.dumps(state_copy['output_hashes'])
+        if "output_hashes" in state_copy and isinstance(state_copy["output_hashes"], dict):
+            state_copy["output_hashes"] = json.dumps(state_copy["output_hashes"])
 
-        if 'metadata' in state_copy and isinstance(state_copy['metadata'], dict):
-            state_copy['metadata'] = json.dumps(state_copy['metadata'])
+        if "metadata" in state_copy and isinstance(state_copy["metadata"], dict):
+            state_copy["metadata"] = json.dumps(state_copy["metadata"])
 
         # Ensure video_path is set
-        state_copy['video_path'] = str(video_path)
+        state_copy["video_path"] = str(video_path)
 
         # Use insert with replace=True for upsert behavior
         # This works better than upsert() for existing tables
         self.db["job_items"].insert(state_copy, pk="job_id", replace=True)
 
     def verify_hashes(
-        self,
-        video_path: str,
-        config_hash: str,
-        input_hashes: Dict[str, Any]
+        self, video_path: str, config_hash: str, input_hashes: Dict[str, Any]
     ) -> Tuple[bool, str]:
         """Check if item is dirty (config or input changed).
 
@@ -218,20 +211,20 @@ class SQLiteManifest(ManifestStore):
             return False, "Item not in manifest"
 
         # Tier 0: Config hash check
-        if item.get('config_hash') != config_hash:
+        if item.get("config_hash") != config_hash:
             return False, "Config changed"
 
         # Tier 1: Size check (instant)
-        if item.get('input_size') != input_hashes.get('size'):
+        if item.get("input_size") != input_hashes.get("size"):
             return False, "File size changed"
 
         # Tier 2: Quick hash check (instant)
-        if item.get('input_hash_quick') == input_hashes.get('quick_hash'):
+        if item.get("input_hash_quick") == input_hashes.get("quick_hash"):
             # Quick hash matches - very likely unchanged
             return True, "Content unchanged (quick hash match)"
 
         # Tier 3: Full hash check (slow but accurate)
-        if item.get('input_hash_full') != input_hashes.get('full_hash'):
+        if item.get("input_hash_full") != input_hashes.get("full_hash"):
             return False, "File content changed"
 
         # Quick hash changed but full hash same = metadata-only change
@@ -247,11 +240,14 @@ class SQLiteManifest(ManifestStore):
         Sets status='dirty' and updates timestamp.
         """
         with self.db.conn:
-            self.db.execute("""
+            self.db.execute(
+                """
                 UPDATE job_items
                 SET status = ?, updated_at = ?
                 WHERE video_path = ?
-            """, (JobStatus.DIRTY.value, datetime.now().isoformat(), str(video_path)))
+            """,
+                (JobStatus.DIRTY.value, datetime.now().isoformat(), str(video_path)),
+            )
 
     def get_all_items(self, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """Query items by status.
@@ -274,20 +270,20 @@ class SQLiteManifest(ManifestStore):
             item = dict(row)
 
             # Deserialize JSON fields
-            if item.get('output_files'):
-                item['output_files'] = json.loads(item['output_files'])
+            if item.get("output_files"):
+                item["output_files"] = json.loads(item["output_files"])
             else:
-                item['output_files'] = []
+                item["output_files"] = []
 
-            if item.get('output_hashes'):
-                item['output_hashes'] = json.loads(item['output_hashes'])
+            if item.get("output_hashes"):
+                item["output_hashes"] = json.loads(item["output_hashes"])
             else:
-                item['output_hashes'] = {}
+                item["output_hashes"] = {}
 
-            if item.get('metadata'):
-                item['metadata'] = json.loads(item['metadata'])
+            if item.get("metadata"):
+                item["metadata"] = json.loads(item["metadata"])
             else:
-                item['metadata'] = {}
+                item["metadata"] = {}
 
             items.append(item)
 
@@ -333,23 +329,28 @@ class SQLiteQueue(QueueBackend):
         existing = self.manifest.get_item_state(item.video_path)
 
         # Don't re-enqueue completed or running items
-        if existing and existing.get('status') in (JobStatus.SUCCEEDED.value, JobStatus.RUNNING.value):
+        if existing and existing.get("status") in (
+            JobStatus.SUCCEEDED.value,
+            JobStatus.RUNNING.value,
+        ):
             return
 
         # Convert model to dict for storage
         state = {
-            'job_id': item.job_id,
-            'video_path': item.video_path,
-            'input_hash_quick': item.input_hash_quick,
-            'input_hash_full': item.input_hash_full,
-            'input_size': item.input_size,
-            'config_hash': item.config_hash,
-            'status': item.status.value if isinstance(item.status, JobStatus) else item.status,
-            'priority': item.priority,
-            'attempt_count': item.attempt_count,
-            'max_attempts': item.max_attempts,
-            'created_at': item.created_at.isoformat() if isinstance(item.created_at, datetime) else item.created_at,
-            'metadata': item.metadata,
+            "job_id": item.job_id,
+            "video_path": item.video_path,
+            "input_hash_quick": item.input_hash_quick,
+            "input_hash_full": item.input_hash_full,
+            "input_size": item.input_size,
+            "config_hash": item.config_hash,
+            "status": item.status.value if isinstance(item.status, JobStatus) else item.status,
+            "priority": item.priority,
+            "attempt_count": item.attempt_count,
+            "max_attempts": item.max_attempts,
+            "created_at": item.created_at.isoformat()
+            if isinstance(item.created_at, datetime)
+            else item.created_at,
+            "metadata": item.metadata,
         }
 
         self.manifest.upsert_item(item.video_path, state)
@@ -393,7 +394,8 @@ class SQLiteQueue(QueueBackend):
                     try:
                         now = datetime.now().isoformat()
 
-                        cursor = self.db.conn.execute("""
+                        cursor = self.db.conn.execute(
+                            """
                             UPDATE job_items
                             SET status = ?,
                                 worker_id = ?,
@@ -406,13 +408,9 @@ class SQLiteQueue(QueueBackend):
                                 LIMIT 1
                             )
                             RETURNING *
-                        """, (
-                            JobStatus.RUNNING.value,
-                            worker_id,
-                            now,
-                            now,
-                            JobStatus.PENDING.value
-                        ))
+                        """,
+                            (JobStatus.RUNNING.value, worker_id, now, now, JobStatus.PENDING.value),
+                        )
 
                         row = cursor.fetchone()
                         self.db.conn.commit()
@@ -423,7 +421,7 @@ class SQLiteQueue(QueueBackend):
                                 job_id=row[0],  # job_id is first column
                                 from_state=JobStatus.PENDING.value,
                                 to_state=JobStatus.RUNNING.value,
-                                worker_id=worker_id
+                                worker_id=worker_id,
                             )
 
                             # Convert row to JobItem
@@ -439,7 +437,7 @@ class SQLiteQueue(QueueBackend):
                 error_msg = str(e).lower()
                 if "database is locked" in error_msg and attempt < max_retries - 1:
                     # Exponential backoff: 100ms, 200ms, 400ms
-                    time.sleep(0.1 * (2 ** attempt))
+                    time.sleep(0.1 * (2**attempt))
                     continue
                 raise
 
@@ -455,10 +453,28 @@ class SQLiteQueue(QueueBackend):
             JobItem instance
         """
         # Row columns match job_items table schema (20 columns with updated_at)
-        (job_id, video_path, input_hash_quick, input_hash_full, input_size,
-         config_hash, status, priority, attempt_count, max_attempts,
-         created_at, updated_at, started_at, completed_at, last_heartbeat, worker_id,
-         last_error, output_files, output_hashes, metadata) = row
+        (
+            job_id,
+            video_path,
+            input_hash_quick,
+            input_hash_full,
+            input_size,
+            config_hash,
+            status,
+            priority,
+            attempt_count,
+            max_attempts,
+            created_at,
+            updated_at,
+            started_at,
+            completed_at,
+            last_heartbeat,
+            worker_id,
+            last_error,
+            output_files,
+            output_hashes,
+            metadata,
+        ) = row
 
         return JobItem(
             job_id=job_id,
@@ -479,7 +495,7 @@ class SQLiteQueue(QueueBackend):
             last_error=last_error,
             output_files=json.loads(output_files) if output_files else [],
             output_hashes=json.loads(output_hashes) if output_hashes else {},
-            metadata=json.loads(metadata) if metadata else {}
+            metadata=json.loads(metadata) if metadata else {},
         )
 
     def ack_success(self, job_id: str, result: JobResult) -> None:
@@ -512,26 +528,29 @@ class SQLiteQueue(QueueBackend):
 
         # Atomic state update
         with self.db.conn:
-            self.db.execute("""
+            self.db.execute(
+                """
                 UPDATE job_items
                 SET status = ?,
                     completed_at = ?,
                     output_files = ?,
                     output_hashes = ?
                 WHERE job_id = ?
-            """, (
-                JobStatus.SUCCEEDED.value,
-                datetime.now().isoformat(),
-                json.dumps(result.output_files),
-                json.dumps(output_hashes),
-                job_id
-            ))
+            """,
+                (
+                    JobStatus.SUCCEEDED.value,
+                    datetime.now().isoformat(),
+                    json.dumps(result.output_files),
+                    json.dumps(output_hashes),
+                    job_id,
+                ),
+            )
 
             self._log_transition(
                 job_id=job_id,
                 from_state=JobStatus.RUNNING.value,
                 to_state=JobStatus.SUCCEEDED.value,
-                worker_id=None
+                worker_id=None,
             )
 
     def ack_fail(self, job_id: str, error: str, retry: bool) -> None:
@@ -546,59 +565,60 @@ class SQLiteQueue(QueueBackend):
         - If retry=True and attempts < max_attempts: reset to 'pending'
         - Otherwise: set to 'failed' (terminal state)
         """
-        item = self.manifest.get_item_state(self.get_status(job_id)['video_path'])
-        new_attempt = item['attempt_count'] + 1
+        item = self.manifest.get_item_state(self.get_status(job_id)["video_path"])
+        new_attempt = item["attempt_count"] + 1
 
         # Truncate error message
         error_snippet = error[:500] if error else None
 
         with self.db.conn:
-            if retry and new_attempt < item['max_attempts']:
+            if retry and new_attempt < item["max_attempts"]:
                 # Retry: reset to pending
-                self.db.execute("""
+                self.db.execute(
+                    """
                     UPDATE job_items
                     SET status = ?,
                         attempt_count = ?,
                         last_error = ?,
                         worker_id = NULL
                     WHERE job_id = ?
-                """, (
-                    JobStatus.PENDING.value,
-                    new_attempt,
-                    error_snippet,
-                    job_id
-                ))
+                """,
+                    (JobStatus.PENDING.value, new_attempt, error_snippet, job_id),
+                )
 
                 self._log_transition(
                     job_id=job_id,
                     from_state=JobStatus.RUNNING.value,
                     to_state=JobStatus.PENDING.value,
                     worker_id=None,
-                    error=error_snippet
+                    error=error_snippet,
                 )
             else:
                 # Failed: terminal state
-                self.db.execute("""
+                self.db.execute(
+                    """
                     UPDATE job_items
                     SET status = ?,
                         completed_at = ?,
                         attempt_count = ?,
                         last_error = ?
                     WHERE job_id = ?
-                """, (
-                    JobStatus.FAILED.value,
-                    datetime.now().isoformat(),
-                    new_attempt,
-                    error_snippet,
-                    job_id
-                ))
+                """,
+                    (
+                        JobStatus.FAILED.value,
+                        datetime.now().isoformat(),
+                        new_attempt,
+                        error_snippet,
+                        job_id,
+                    ),
+                )
 
                 self._log_transition(
                     job_id=job_id,
                     from_state=JobStatus.RUNNING.value,
                     to_state=JobStatus.FAILED.value,
                     worker_id=None,
-                    error=error_snippet
+                    error=error_snippet,
                 )
 
     def get_status(self, job_id: str) -> Dict[str, Any]:
@@ -617,12 +637,12 @@ class SQLiteQueue(QueueBackend):
         row = dict(rows[0])
 
         # Deserialize JSON fields
-        if row.get('output_files'):
-            row['output_files'] = json.loads(row['output_files'])
-        if row.get('output_hashes'):
-            row['output_hashes'] = json.loads(row['output_hashes'])
-        if row.get('metadata'):
-            row['metadata'] = json.loads(row['metadata'])
+        if row.get("output_files"):
+            row["output_files"] = json.loads(row["output_files"])
+        if row.get("output_hashes"):
+            row["output_hashes"] = json.loads(row["output_hashes"])
+        if row.get("metadata"):
+            row["metadata"] = json.loads(row["metadata"])
 
         return row
 
@@ -650,7 +670,8 @@ class SQLiteQueue(QueueBackend):
         cutoff_started = datetime.now() - timedelta(seconds=timeout_s)
 
         with self.db.conn:
-            cursor = self.db.execute("""
+            cursor = self.db.execute(
+                """
                 UPDATE job_items
                 SET status = ?, worker_id = NULL
                 WHERE status = ?
@@ -659,12 +680,14 @@ class SQLiteQueue(QueueBackend):
                       OR (started_at < ? AND last_heartbeat IS NULL)
                   )
                 RETURNING job_id
-            """, (
-                JobStatus.PENDING.value,
-                JobStatus.RUNNING.value,
-                cutoff_heartbeat.isoformat(),
-                cutoff_started.isoformat()
-            ))
+            """,
+                (
+                    JobStatus.PENDING.value,
+                    JobStatus.RUNNING.value,
+                    cutoff_heartbeat.isoformat(),
+                    cutoff_started.isoformat(),
+                ),
+            )
 
             rows = cursor.fetchall()
 
@@ -675,7 +698,7 @@ class SQLiteQueue(QueueBackend):
                     from_state=JobStatus.RUNNING.value,
                     to_state=JobStatus.PENDING.value,
                     worker_id=None,
-                    error="Reset stale job (crash recovery)"
+                    error="Reset stale job (crash recovery)",
                 )
 
             return len(rows)
@@ -690,15 +713,14 @@ class SQLiteQueue(QueueBackend):
         Called periodically by worker (e.g., every 60s).
         """
         with self.db.conn:
-            self.db.execute("""
+            self.db.execute(
+                """
                 UPDATE job_items
                 SET last_heartbeat = ?
                 WHERE job_id = ? AND status = ?
-            """, (
-                datetime.now().isoformat(),
-                job_id,
-                JobStatus.RUNNING.value
-            ))
+            """,
+                (datetime.now().isoformat(), job_id, JobStatus.RUNNING.value),
+            )
 
     def get_all_items(self, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """Query items by status.
@@ -717,7 +739,7 @@ class SQLiteQueue(QueueBackend):
         from_state: str,
         to_state: str,
         worker_id: Optional[str] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ):
         """Log state transition to audit trail.
 
@@ -728,11 +750,13 @@ class SQLiteQueue(QueueBackend):
             worker_id: Worker that caused transition
             error: Error message if applicable
         """
-        self.db["state_transitions"].insert({
-            "job_id": job_id,
-            "from_state": from_state,
-            "to_state": to_state,
-            "timestamp": datetime.now().isoformat(),
-            "worker_id": worker_id,
-            "error_snippet": error[:200] if error else None,
-        })
+        self.db["state_transitions"].insert(
+            {
+                "job_id": job_id,
+                "from_state": from_state,
+                "to_state": to_state,
+                "timestamp": datetime.now().isoformat(),
+                "worker_id": worker_id,
+                "error_snippet": error[:200] if error else None,
+            }
+        )

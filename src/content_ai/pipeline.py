@@ -1,17 +1,14 @@
-import os
-import time
-import json
-import uuid
 import datetime
+import json
+import os
+import uuid
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict
 
 from . import config as config_lib
-from . import scanner
-from . import detector
-from . import segments as seg_lib
-from . import renderer
 from . import demo as demo_lib
+from . import detector, renderer, scanner
+from . import segments as seg_lib
 
 
 def get_run_dir(output_base: str) -> Path:
@@ -72,9 +69,7 @@ def run_scan(cli_args: Dict[str, Any]):
         exts = [e.strip() for e in exts.split(",")]
 
     print(f"Scanning {input_path}...")
-    video_files = scanner.scan_input(
-        input_path, recursive=recursive, limit=limit, extensions=exts
-    )
+    video_files = scanner.scan_input(input_path, recursive=recursive, limit=limit, extensions=exts)
     print(f"Found {len(video_files)} videos.")
 
     if not video_files:
@@ -88,7 +83,7 @@ def run_scan(cli_args: Dict[str, Any]):
     pad_s = conf["processing"]["context_padding_s"]
     merge_s = conf["processing"]["merge_gap_s"]
     max_seg_dur = conf["processing"].get("max_segment_duration_s", None)
-    min_dur = conf["detection"]["min_event_duration_s"]
+    # min_dur = conf["detection"]["min_event_duration_s"] # noqa: F841
 
     for v_path in video_files:
         print(f"Processing {v_path.name}...")
@@ -143,9 +138,7 @@ def run_scan(cli_args: Dict[str, Any]):
 
     elif order == "score":
         # Sort by score desc
-        all_segments.sort(
-            key=lambda x: (-x.get("score", 0), x["source_path"], x["start"])
-        )
+        all_segments.sort(key=lambda x: (-x.get("score", 0), x["source_path"], x["start"]))
 
     elif order == "hybrid":
         # Group by source
@@ -219,7 +212,7 @@ def run_scan(cli_args: Dict[str, Any]):
                     if os.path.exists(p):
                         try:
                             os.remove(p)
-                        except:
+                        except Exception:
                             pass
     else:
         print("No segments selected. Skipping montage.")

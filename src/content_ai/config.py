@@ -1,6 +1,8 @@
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Union
+from typing import Any, Dict, Union
+
+import yaml
+
 from .models import ContentAIConfig
 
 DEFAULT_CONFIG_PATH = Path("config/default.yaml")

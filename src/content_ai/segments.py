@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 Segment = Dict[str, Any]  # Dictionary containing at least 'start', 'end'
 
@@ -79,9 +79,7 @@ def merge_segments(
     return merged
 
 
-def clamp_segments(
-    segments: List[Segment], min_time: float, max_time: float
-) -> List[Segment]:
+def clamp_segments(segments: List[Segment], min_time: float, max_time: float) -> List[Segment]:
     """
     Clamp segment start/end times to valid range [min_time, max_time].
     Removes segments that become invalid (start >= end) after clamping.

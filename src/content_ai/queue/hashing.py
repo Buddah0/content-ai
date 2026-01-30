@@ -11,7 +11,7 @@ maintaining correctness via full content verification when needed.
 import hashlib
 import json
 import os
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Dict, Optional, Tuple
 
 
 def compute_input_hash(video_path: str) -> Dict[str, Any]:
@@ -63,7 +63,7 @@ def compute_input_hash(video_path: str) -> Dict[str, Any]:
     sample_positions = [0.0, 0.25, 0.5, 0.75, 1.0]
     chunk_size = 1024 * 1024  # 1MB per sample
 
-    with open(video_path, 'rb') as f:
+    with open(video_path, "rb") as f:
         for pos in sample_positions:
             if pos < 1.0:
                 offset = int(file_size * pos)
@@ -78,15 +78,15 @@ def compute_input_hash(video_path: str) -> Dict[str, Any]:
     # Tier 2: Full content hash using BLAKE2b (faster than SHA-256)
     full_hasher = hashlib.blake2b()
 
-    with open(video_path, 'rb') as f:
+    with open(video_path, "rb") as f:
         # Read in 64KB chunks for memory efficiency
-        for chunk in iter(lambda: f.read(65536), b''):
+        for chunk in iter(lambda: f.read(65536), b""):
             full_hasher.update(chunk)
 
     return {
-        'quick_hash': quick_hasher.hexdigest(),
-        'full_hash': full_hasher.hexdigest(),
-        'size': file_size,
+        "quick_hash": quick_hasher.hexdigest(),
+        "full_hash": full_hasher.hexdigest(),
+        "size": file_size,
     }
 
 
@@ -110,9 +110,9 @@ def compute_config_hash(config: Any) -> str:
         - Excludes non-deterministic fields (timestamps, paths)
     """
     # Convert Pydantic model to dict if needed
-    if hasattr(config, 'model_dump'):
+    if hasattr(config, "model_dump"):
         config_dict = config.model_dump()
-    elif hasattr(config, 'dict'):
+    elif hasattr(config, "dict"):
         config_dict = config.dict()
     else:
         config_dict = config
@@ -145,16 +145,15 @@ def compute_output_hash(file_path: str) -> str:
 
     hasher = hashlib.sha256()
 
-    with open(file_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
 
     return hasher.hexdigest()
 
 
 def verify_output_integrity(
-    output_files: list,
-    expected_hashes: Dict[str, str]
+    output_files: list, expected_hashes: Dict[str, str]
 ) -> Tuple[bool, Optional[str]]:
     """Verify all output files match expected hashes.
 

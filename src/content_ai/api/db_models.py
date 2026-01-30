@@ -1,9 +1,11 @@
-from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Enum, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
+
 
 class JobStatus(enum.Enum):
     PENDING = "PENDING"
@@ -14,12 +16,14 @@ class JobStatus(enum.Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
+
 class Asset(Base):
     __tablename__ = "Asset"
     id = Column(String, primary_key=True)
     filename = Column(String)
     path = Column(String)
-    createdAt = Column(DateTime, default=datetime.utcnow)
+    createdAt = Column(DateTime, default=datetime.utcnow)  # noqa: N815
+
 
 class Job(Base):
     __tablename__ = "Job"
@@ -27,22 +31,24 @@ class Job(Base):
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     progress = Column(Integer, default=0)
     createdAt = Column(DateTime, default=datetime.utcnow)
-    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    assetId = Column(String, ForeignKey("Asset.id"))
-    settings = Column(String, nullable=True) # JSON string of settings used
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # noqa: N815
+    assetId = Column(String, ForeignKey("Asset.id"))  # noqa: N815
+    settings = Column(String, nullable=True)  # JSON string of settings used
+
 
 class Segment(Base):
     __tablename__ = "Segment"
     id = Column(String, primary_key=True)
-    startTime = Column(Float)
-    endTime = Column(Float)
+    startTime = Column(Float)  # noqa: N815
+    endTime = Column(Float)  # noqa: N815
     score = Column(Float)
     label = Column(String, nullable=True)
-    jobId = Column(String, ForeignKey("Job.id"))
+    jobId = Column(String, ForeignKey("Job.id"))  # noqa: N815
+
 
 class Output(Base):
     __tablename__ = "Output"
     id = Column(String, primary_key=True)
     path = Column(String)
-    type = Column(String) # "16:9" or "9:16"
-    jobId = Column(String, ForeignKey("Job.id"))
+    type = Column(String)  # "16:9" or "9:16"
+    jobId = Column(String, ForeignKey("Job.id"))  # noqa: N815

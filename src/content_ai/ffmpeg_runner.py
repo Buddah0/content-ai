@@ -14,39 +14,42 @@ Key Features:
 
 import os
 import re
-import time
 import signal
 import subprocess
 import threading
-from pathlib import Path
-from typing import Optional, Callable, List, Tuple
+import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Callable, List, Optional, Tuple
 
 
 class FfmpegErrorType(Enum):
     """FFmpeg error classification for retry logic."""
-    PERMANENT = "permanent"     # File not found, invalid format, codec error
-    TRANSIENT = "transient"     # Network timeout, disk I/O stall
-    TIMEOUT = "timeout"         # Process timeout (global or no-progress)
-    PROCESS_KILLED = "killed"   # SIGTERM/SIGKILL cleanup
+
+    PERMANENT = "permanent"  # File not found, invalid format, codec error
+    TRANSIENT = "transient"  # Network timeout, disk I/O stall
+    TIMEOUT = "timeout"  # Process timeout (global or no-progress)
+    PROCESS_KILLED = "killed"  # SIGTERM/SIGKILL cleanup
 
 
 @dataclass
 class FfmpegProgress:
     """Real-time FFmpeg progress metrics."""
-    current_time_s: float = 0.0      # Current position in seconds
-    total_duration_s: float = 0.0    # Total duration (if known)
-    fps: float = 0.0                 # Current FPS
-    bitrate_kbps: float = 0.0        # Current bitrate
-    speed: float = 0.0               # Processing speed multiplier (e.g., 2.5x)
-    frame: int = 0                   # Current frame number
-    last_update: float = 0.0         # Timestamp of last update
+
+    current_time_s: float = 0.0  # Current position in seconds
+    total_duration_s: float = 0.0  # Total duration (if known)
+    fps: float = 0.0  # Current FPS
+    bitrate_kbps: float = 0.0  # Current bitrate
+    speed: float = 0.0  # Processing speed multiplier (e.g., 2.5x)
+    frame: int = 0  # Current frame number
+    last_update: float = 0.0  # Timestamp of last update
 
 
 @dataclass
 class FfmpegResult:
     """Result of FFmpeg execution."""
+
     success: bool
     returncode: int
     stdout: str
@@ -104,7 +107,7 @@ class FfmpegRunner:
         save_artifacts_on_failure: bool = True,
         ffmpeg_loglevel: str = "info",
         temp_dir: Optional[str] = None,
-        progress_callback: Optional[Callable[[FfmpegProgress], None]] = None
+        progress_callback: Optional[Callable[[FfmpegProgress], None]] = None,
     ):
         """Initialize FFmpeg runner.
 
@@ -145,7 +148,7 @@ class FfmpegRunner:
         level: Optional[str] = None,
         pixel_format: Optional[str] = None,
         target_fps: Optional[int] = None,
-        crf: Optional[int] = None
+        crf: Optional[int] = None,
     ) -> FfmpegResult:
         """Extract video segment with frame-accurate seeking.
 
@@ -174,12 +177,18 @@ class FfmpegRunner:
         cmd = [
             self._get_ffmpeg_exe(),
             "-y",  # Overwrite output
-            "-ss", str(start),  # Fast seek to start (before input)
-            "-i", source_path,
-            "-t", str(duration),  # Duration to extract
-            "-c:v", codec,
-            "-preset", preset,
-            "-c:a", audio_codec,
+            "-ss",
+            str(start),  # Fast seek to start (before input)
+            "-i",
+            source_path,
+            "-t",
+            str(duration),  # Duration to extract
+            "-c:v",
+            codec,
+            "-preset",
+            preset,
+            "-c:a",
+            audio_codec,
         ]
 
         # Add optional video parameters
@@ -195,19 +204,19 @@ class FfmpegRunner:
         if crf is not None:
             cmd.extend(["-crf", str(crf)])
 
-        cmd.extend([
-            "-progress", "pipe:2",  # Progress to stderr
-            "-loglevel", self.ffmpeg_loglevel,
-            output_path
-        ])
+        cmd.extend(
+            [
+                "-progress",
+                "pipe:2",  # Progress to stderr
+                "-loglevel",
+                self.ffmpeg_loglevel,
+                output_path,
+            ]
+        )
 
         return self._run_ffmpeg(cmd, expected_duration=duration)
 
-    def concat_videos(
-        self,
-        input_files: List[str],
-        output_path: str
-    ) -> FfmpegResult:
+    def concat_videos(self, input_files: List[str], output_path: str) -> FfmpegResult:
         """Concatenate videos using concat demuxer (stream copy).
 
         Args:
@@ -239,13 +248,19 @@ class FfmpegRunner:
             cmd = [
                 self._get_ffmpeg_exe(),
                 "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", str(list_path),
-                "-c", "copy",  # Stream copy (no re-encoding)
-                "-progress", "pipe:2",
-                "-loglevel", self.ffmpeg_loglevel,
-                output_path
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_path),
+                "-c",
+                "copy",  # Stream copy (no re-encoding)
+                "-progress",
+                "pipe:2",
+                "-loglevel",
+                self.ffmpeg_loglevel,
+                output_path,
             ]
 
             result = self._run_ffmpeg(cmd)
@@ -257,9 +272,7 @@ class FfmpegRunner:
                 list_path.unlink()
 
     def _run_ffmpeg(
-        self,
-        cmd: List[str],
-        expected_duration: Optional[float] = None
+        self, cmd: List[str], expected_duration: Optional[float] = None
     ) -> FfmpegResult:
         """Execute FFmpeg with timeout enforcement and progress monitoring.
 
@@ -281,32 +294,27 @@ class FfmpegRunner:
                 stderr=subprocess.PIPE,
                 stdin=subprocess.DEVNULL,
                 text=True,
-                bufsize=1  # Line buffered for real-time progress
+                bufsize=1,  # Line buffered for real-time progress
             )
 
             # Start progress monitoring thread
             self._stop_monitoring.clear()
             self._monitor_thread = threading.Thread(
-                target=self._monitor_progress,
-                args=(self._process.stderr,),
-                daemon=True
+                target=self._monitor_progress, args=(self._process.stderr,), daemon=True
             )
             self._monitor_thread.start()
 
             # Enforce timeouts
             timeout_occurred = False
-            timeout_type = None
 
             try:
-                stdout, stderr = self._process.communicate(
-                    timeout=self.global_timeout_s
-                )
+                stdout, stderr = self._process.communicate(timeout=self.global_timeout_s)
                 returncode = self._process.returncode
 
             except subprocess.TimeoutExpired:
                 # Global timeout exceeded
-                timeout_occurred = True
-                timeout_type = "global"
+                # timeout_occurred = True
+                # timeout_type = "global" # noqa: F841
                 stdout, stderr = self._kill_process_tree()
                 returncode = -1
 
@@ -315,7 +323,7 @@ class FfmpegRunner:
                 time_since_progress = time.time() - self._progress.last_update
                 if time_since_progress > self.no_progress_timeout_s:
                     timeout_occurred = True
-                    timeout_type = "no_progress"
+                    # timeout_type = "no_progress" # noqa: F841
                     stdout_kill, stderr_kill = self._kill_process_tree()
                     # Append kill output to existing output
                     stdout = (stdout or "") + (stdout_kill or "")
@@ -349,10 +357,10 @@ class FfmpegRunner:
                 duration_s=duration,
                 error_type=error_type,
                 final_progress=self._progress,
-                artifacts_saved=artifacts
+                artifacts_saved=artifacts,
             )
 
-        except Exception as e:
+        except Exception:
             # Unexpected error - ensure cleanup
             self._kill_process_tree()
             raise
@@ -385,7 +393,7 @@ class FfmpegRunner:
                 # Parse progress markers
                 if "out_time=" in line:
                     # Parse time like "00:01:23.45"
-                    match = re.search(r'out_time=(\d+):(\d+):(\d+)\.(\d+)', line)
+                    match = re.search(r"out_time=(\d+):(\d+):(\d+)\.(\d+)", line)
                     if match:
                         h, m, s, cs = match.groups()
                         current_time = int(h) * 3600 + int(m) * 60 + int(s) + int(cs) / 100
@@ -393,22 +401,22 @@ class FfmpegRunner:
                         self._progress.last_update = time.time()
 
                 if "frame=" in line:
-                    match = re.search(r'frame=\s*(\d+)', line)
+                    match = re.search(r"frame=\s*(\d+)", line)
                     if match:
                         self._progress.frame = int(match.group(1))
 
                 if "fps=" in line:
-                    match = re.search(r'fps=\s*([\d.]+)', line)
+                    match = re.search(r"fps=\s*([\d.]+)", line)
                     if match:
                         self._progress.fps = float(match.group(1))
 
                 if "bitrate=" in line:
-                    match = re.search(r'bitrate=\s*([\d.]+)kbits/s', line)
+                    match = re.search(r"bitrate=\s*([\d.]+)kbits/s", line)
                     if match:
                         self._progress.bitrate_kbps = float(match.group(1))
 
                 if "speed=" in line:
-                    match = re.search(r'speed=\s*([\d.]+)x', line)
+                    match = re.search(r"speed=\s*([\d.]+)x", line)
                     if match:
                         self._progress.speed = float(match.group(1))
 
@@ -447,6 +455,7 @@ class FfmpegRunner:
             # Try psutil for robust process tree cleanup (if available)
             try:
                 import psutil
+
                 parent = psutil.Process(self._process.pid)
                 children = parent.children(recursive=True)
 
@@ -460,8 +469,7 @@ class FfmpegRunner:
 
                 # Wait for graceful shutdown
                 gone, alive = psutil.wait_procs(
-                    [parent] + children,
-                    timeout=self.kill_grace_period_s
+                    [parent] + children, timeout=self.kill_grace_period_s
                 )
 
                 # Force kill survivors
@@ -473,7 +481,7 @@ class FfmpegRunner:
 
             except ImportError:
                 # Fallback: manual process group kill
-                if os.name == 'posix':
+                if os.name == "posix":
                     # Send SIGTERM to process group
                     try:
                         os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
@@ -555,12 +563,7 @@ class FfmpegRunner:
         # Default: treat as transient (retry)
         return FfmpegErrorType.TRANSIENT
 
-    def _save_failure_artifacts(
-        self,
-        cmd: List[str],
-        stdout: str,
-        stderr: str
-    ) -> List[Path]:
+    def _save_failure_artifacts(self, cmd: List[str], stdout: str, stderr: str) -> List[Path]:
         """Save debugging artifacts on FFmpeg failure.
 
         Creates:
@@ -613,7 +616,7 @@ class FfmpegRunner:
                 # Properly escape command for shell
                 escaped_cmd = []
                 for arg in cmd:
-                    if ' ' in arg or any(c in arg for c in ['$', '`', '"', '\\']):
+                    if " " in arg or any(c in arg for c in ["$", "`", '"', "\\"]):
                         escaped_cmd.append(f"'{arg}'")
                     else:
                         escaped_cmd.append(arg)
@@ -632,9 +635,9 @@ class FfmpegRunner:
         """Get temporary directory (worker-specific if available)."""
         if self.temp_dir:
             temp_dir = Path(self.temp_dir)
-        elif 'TMPDIR' in os.environ:
+        elif "TMPDIR" in os.environ:
             # Use worker-specific temp dir
-            temp_dir = Path(os.environ['TMPDIR'])
+            temp_dir = Path(os.environ["TMPDIR"])
         else:
             temp_dir = Path("/tmp")
 
@@ -645,4 +648,5 @@ class FfmpegRunner:
     def _get_ffmpeg_exe() -> str:
         """Get FFmpeg executable path."""
         import imageio_ffmpeg
+
         return imageio_ffmpeg.get_ffmpeg_exe()

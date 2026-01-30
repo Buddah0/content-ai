@@ -1,6 +1,8 @@
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+import pytest
+
 from content_ai.scanner import scan_input
 
 

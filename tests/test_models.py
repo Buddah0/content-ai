@@ -2,12 +2,13 @@
 
 import pytest
 from pydantic import ValidationError
+
 from content_ai.models import (
     ContentAIConfig,
     DetectionConfig,
+    DetectionEvent,
     OutputConfig,
     Segment,
-    DetectionEvent,
 )
 
 
@@ -50,7 +51,7 @@ def test_content_ai_config_from_dict():
     data = {
         "detection": {"rms_threshold": 0.2},
         "processing": {"merge_gap_s": 3.0},
-        "output": {"max_duration_s": 60}
+        "output": {"max_duration_s": 60},
     }
     config = ContentAIConfig.from_dict(data)
     assert config.detection.rms_threshold == 0.2
