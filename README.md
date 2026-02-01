@@ -8,9 +8,9 @@
 - **Smart Merging**: Intelligently merges close-together clips with max duration enforcement and deterministic tie-breaking
 - **Batch Processing**: Recursively scans folders to process multiple videos in a single run
 - **Job Queue System**: Resumable batch processing with crash recovery, dirty detection, and parallel execution
-- **Robust Rendering**: ✨ **COMPLETE** - Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
-- **Mission Control Web UI**: ✨ **COMPLETE** - Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
-- **Fully Configurable**: YAML-based configuration with CLI flag overrides and Pydantic validation
+- **Robust Rendering**: Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
+- **Mission Control Web UI**: Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
+- **Fully Configurable**: 🚧 **IN PROGRESS** - YAML-based configuration with CLI flag overrides and Pydantic validation
 - **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
 - **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
 
@@ -44,19 +44,24 @@ npx prisma generate
 
 ## Running Mission Control
 
-You need both the backend and frontend running for the full experience.
+> [!IMPORTANT]
+> You need **two separate terminal windows** running simultaneously for the full experience.
 
-### 1. Start Backend (FastAPI)
+### Terminal 1: Start Backend (FastAPI)
+Run this command from the root `content-ai` directory:
 ```bash
+# Start from the root folder
 ./venv/bin/python -m uvicorn content_ai.api.main:app --app-dir src --reload --port 8000
 ```
 
-### 2. Start Frontend (Next.js)
+### Terminal 2: Start Frontend (Next.js)
+Open a new terminal window and move into the `web` folder:
 ```bash
+# Navigate to web/ and start the UI
 cd web
-yarn dev
+npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000)
+Once both are running, open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
