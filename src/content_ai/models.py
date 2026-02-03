@@ -17,6 +17,15 @@ class DetectionConfig(BaseModel):
     hpss_margin: tuple[float, float] = Field(
         default=(1.0, 5.0), description="HPSS (harmonic, percussive) margins"
     )
+    adaptive_threshold: bool = Field(
+        default=True, description="Use adaptive thresholding (Mean + k*Std) instead of fixed"
+    )
+    sensitivity: float = Field(
+        default=2.5, ge=0.0, description="Adaptive sensitivity (k in Mean + k*Std). Higher = fewer events."
+    )
+    event_lookback_s: float = Field(
+        default=5.0, ge=0.0, description="Seconds to look back from the start of an event (captures build-up)"
+    )
 
 
 class ProcessingConfig(BaseModel):

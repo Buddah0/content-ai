@@ -30,7 +30,11 @@ def run_scan(cli_args: Dict[str, Any]):
     Main entry point for 'scan' command.
     """
     # 1. Config
-    conf = config_lib.resolve_config(cli_args)
+    conf_obj = config_lib.resolve_config(cli_args)
+    if hasattr(conf_obj, "model_dump"):
+        conf = conf_obj.model_dump()
+    else:
+        conf = conf_obj
 
     # Handle demo mode
     is_demo = cli_args.get("demo", False)

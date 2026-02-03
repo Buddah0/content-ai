@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Clock, Loader2, XCircle, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, XCircle, ArrowRight, RefreshCw, Trash2 } from 'lucide-react';
 
 const API_BASE = "http://localhost:8000";
 
@@ -53,7 +53,14 @@ export default function HistoryPage() {
 
     const formatDate = (isoString: string | null) => {
         if (!isoString) return "—";
-        return new Date(isoString).toLocaleString();
+        return new Date(isoString).toLocaleString(undefined, {
+            month: 'numeric',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
     };
 
     return (
@@ -109,6 +116,23 @@ export default function HistoryPage() {
                                             </Link>
                                         </Button>
                                     )}
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (!confirm('Are you sure you want to delete this job?')) return;
+                                            try {
+                                                await fetch(`${API_BASE}/jobs/${job.id}`, { method: 'DELETE' });
+                                                setJobs(jobs.filter(j => j.id !== job.id));
+                                            } catch (err) {
+                                                console.error("Failed to delete", err);
+                                            }
+                                        }}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
