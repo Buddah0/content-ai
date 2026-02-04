@@ -56,6 +56,22 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* AI Aesthetic - Neon Accents */
+    --neon-blue: 199 89% 48%;
+    --neon-purple: 270 95% 65%;
+    --neon-cyan: 180 100% 50%;
+    --neon-pink: 330 100% 65%;
+
+    /* Glass & Surface Tokens */
+    --glass-bg: 222.2 84% 8%;
+    --glass-border: 217.2 32.6% 25%;
+    --glass-highlight: 210 40% 98%;
+
+    /* Glow Intensities */
+    --glow-sm: 0 0 10px;
+    --glow-md: 0 0 20px;
+    --glow-lg: 0 0 40px;
   }
 }
 

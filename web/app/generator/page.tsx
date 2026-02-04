@@ -130,7 +130,7 @@ export default function GeneratorPage() {
         <div className="container mx-auto max-w-4xl py-12 px-4 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Mission Control</h1>
+                    <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Mission Control</h1>
                     <p className="text-muted-foreground">Generate creator-ready highlights.</p>
                 </div>
             </div>
@@ -152,9 +152,9 @@ export default function GeneratorPage() {
             )}
 
             {step === 'settings' && (
-                <Card>
+                <Card className="border-glass-border bg-glass/40 backdrop-blur-sm shadow-inner-glow">
                     <CardHeader>
-                        <CardTitle>Configuration</CardTitle>
+                        <CardTitle className="text-neon-blue">Configuration</CardTitle>
                         <CardDescription>Customize your output generation.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-8">
@@ -191,7 +191,7 @@ export default function GeneratorPage() {
                             </div>
 
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/20">
+                                <div className="flex items-center justify-between p-4 border border-glass-border rounded-lg bg-glass/30 hover:border-neon-blue/30 transition-colors">
                                     <div className="space-y-0.5">
                                         <Label>Burn-in Captions</Label>
                                         <p className="text-[10px] text-muted-foreground">Add "HYPE!" labels to recognized events.</p>
@@ -202,7 +202,7 @@ export default function GeneratorPage() {
                                     />
                                 </div>
 
-                                <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/20">
+                                <div className="flex items-center justify-between p-4 border border-glass-border rounded-lg bg-glass/30 hover:border-neon-blue/30 transition-colors">
                                     <div className="space-y-0.5">
                                         <Label>Watermark</Label>
                                         <p className="text-[10px] text-muted-foreground">Apply the "LOUD" branding overlay.</p>
@@ -217,7 +217,12 @@ export default function GeneratorPage() {
                     </CardContent>
                     <div className="p-6 pt-0 flex justify-between">
                         <Button variant="ghost" onClick={() => setStep('upload')}>Back</Button>
-                        <Button size="lg" onClick={handleStartJob} disabled={!assetId}>
+                        <Button
+                            size="lg"
+                            onClick={handleStartJob}
+                            disabled={!assetId}
+                            className="bg-gradient-to-r from-neon-blue to-neon-purple hover:from-neon-blue/90 hover:to-neon-purple/90 shadow-glow-sm hover:shadow-glow-blue transition-all duration-300 border-0"
+                        >
                             Generate Highlights
                         </Button>
                     </div>
@@ -225,21 +230,21 @@ export default function GeneratorPage() {
             )}
 
             {step === 'processing' && (
-                <Card className="py-12">
+                <Card className="py-12 border-glass-border bg-glass/40 backdrop-blur-sm shadow-inner-glow">
                     <CardContent className="flex flex-col items-center justify-center space-y-6">
                         <div className="relative">
-                            <Loader2 className="w-16 h-16 animate-spin text-primary" />
+                            <Loader2 className="w-16 h-16 animate-spin text-neon-blue drop-shadow-[0_0_10px_hsl(var(--neon-blue)/0.5)]" />
                             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
                                 {progress}%
                             </div>
                         </div>
                         <div className="text-center space-y-2">
-                            <h3 className="text-2xl font-semibold">{status}</h3>
+                            <h3 className="text-2xl font-semibold text-neon-blue">{status}</h3>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Running AI detection, segmenting timeline, and rendering final outputs...
                             </p>
                         </div>
-                        <Progress value={progress} className="w-full max-w-md" />
+                        <Progress value={progress} className="w-full max-w-md [&>div]:bg-gradient-to-r [&>div]:from-neon-blue [&>div]:to-neon-purple" />
                     </CardContent>
                 </Card>
             )}
@@ -248,18 +253,18 @@ export default function GeneratorPage() {
                 <div className="space-y-8">
                     <div className="grid gap-6 md:grid-cols-2">
                         {outputs.map((out) => (
-                            <Card key={out.path}>
+                            <Card key={out.path} className="border-glass-border bg-glass/40 backdrop-blur-sm shadow-inner-glow hover:border-neon-cyan/30 transition-colors">
                                 <CardHeader>
-                                    <CardTitle>{out.type} Output</CardTitle>
+                                    <CardTitle className="text-neon-cyan">{out.type} Output</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <video
                                         src={`${API_BASE}/${out.path}`}
                                         controls
-                                        className="w-full rounded-lg border bg-black aspect-video"
+                                        className="w-full rounded-lg border border-glass-border bg-black aspect-video"
                                         style={{ aspectRatio: out.type === '9:16' ? '9/16' : '16/9' }}
                                     />
-                                    <Button className="w-full" variant="outline" asChild>
+                                    <Button className="w-full border-neon-cyan/30 hover:border-neon-cyan/50 hover:bg-neon-cyan/5 transition-all" variant="outline" asChild>
                                         <a href={`${API_BASE}/${out.path}`} download>
                                             <Download className="mr-2 w-4 h-4" /> Download {out.type}
                                         </a>
@@ -269,14 +274,14 @@ export default function GeneratorPage() {
                         ))}
                     </div>
 
-                    <Card>
+                    <Card className="border-glass-border bg-glass/40 backdrop-blur-sm shadow-inner-glow">
                         <CardHeader>
-                            <CardTitle>Detected Segments ({segments.length})</CardTitle>
+                            <CardTitle className="text-neon-purple">Detected Segments ({segments.length})</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
                                 {segments.map((seg, i) => (
-                                    <div key={i} className="flex justify-between items-center p-3 rounded-md bg-secondary/20">
+                                    <div key={i} className="flex justify-between items-center p-3 rounded-md bg-glass/30 border border-glass-border hover:border-neon-purple/30 transition-colors">
                                         <span className="font-mono text-sm">Segment {i + 1}</span>
                                         <span className="text-muted-foreground text-sm">
                                             {seg.startTime.toFixed(1)}s - {seg.endTime.toFixed(1)}s
@@ -286,7 +291,12 @@ export default function GeneratorPage() {
                             </div>
                         </CardContent>
                         <div className="p-6 pt-0">
-                            <Button onClick={() => window.location.reload()}>Start New Job</Button>
+                            <Button
+                                onClick={() => window.location.reload()}
+                                className="bg-gradient-to-r from-neon-blue to-neon-purple hover:from-neon-blue/90 hover:to-neon-purple/90 shadow-glow-sm transition-all duration-300 border-0"
+                            >
+                                Start New Job
+                            </Button>
                         </div>
                     </Card>
                 </div>
