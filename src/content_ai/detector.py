@@ -42,7 +42,21 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
         rms = librosa.feature.rms(y=y_percussive)[0]
         times = librosa.times_like(rms, sr=sr)
 
-        hype_mask = rms > rms_thresh
+        if det_conf.get("adaptive_threshold", True):
+            # Adaptive Thresholding
+            mean_rms = float(rms.mean())
+            std_rms = float(rms.std())
+            sensitivity = det_conf.get("sensitivity", 2.5)
+            
+            adaptive_thresh = mean_rms + (sensitivity * std_rms)
+            # Use max of adaptive or absolute floor (rms_thresh)
+            final_thresh = max(adaptive_thresh, rms_thresh)
+            print(f"Adaptive Stats :: Mean: {mean_rms:.4f}, Std: {std_rms:.4f}, K: {sensitivity}")
+            print(f"Threshold :: Adaptive: {adaptive_thresh:.4f} vs Floor: {rms_thresh} -> Final: {final_thresh:.4f}")
+        else:
+            final_thresh = rms_thresh
+
+        hype_mask = rms > final_thresh
 
         # 3. Collect Raw Segments
         raw_segments = []
@@ -53,6 +67,9 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
         for i, is_hype in enumerate(hype_mask):
             t = times[i]
             val = rms[i]
+
+            # Retrieve configurable lookback (default 5s)
+            lookback_s = det_conf.get("event_lookback_s", 5.0)
 
             if is_hype:
                 if not in_segment:
@@ -66,9 +83,14 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
                     in_segment = False
                     seg_dur = t - start_time
                     if seg_dur >= min_dur:
+                        # Apply lookback here to capture context *before* the hype event
+                        adj_start = max(0.0, start_time - lookback_s)
+                        
                         raw_segments.append(
                             {
-                                "start": float(start_time),
+                                "start": float(adj_start),
+                                # We extend end slightly? No, end is end of hype. 
+                                # Often the hype continues (cheers), so end is fine.
                                 "end": float(t),
                                 "score": float(peak_rms),
                                 "video_duration": duration,
@@ -79,9 +101,10 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
         if in_segment:
             seg_dur = times[-1] - start_time
             if seg_dur >= min_dur:
+                adj_start = max(0.0, start_time - det_conf.get("event_lookback_s", 5.0))
                 raw_segments.append(
                     {
-                        "start": float(start_time),
+                        "start": float(adj_start),
                         "end": float(times[-1]),
                         "score": float(peak_rms),
                         "video_duration": duration,

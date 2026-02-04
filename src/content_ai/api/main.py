@@ -5,7 +5,7 @@ import os
 import shutil
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from databases import Database
@@ -171,7 +171,9 @@ async def list_jobs():
             "id": job.id,
             "status": job.status.value if hasattr(job.status, "value") else job.status,
             "progress": job.progress,
-            "createdAt": job.createdAt.isoformat() if job.createdAt else None,
+            "createdAt": job.createdAt.replace(tzinfo=timezone.utc).isoformat()
+            if job.createdAt
+            else None,
             "assetId": job.assetId,
         }
         for job in jobs
@@ -252,6 +254,25 @@ async def get_job(job_id: str):
         "segments": [{"startTime": s.startTime, "endTime": s.endTime} for s in segments],
         "outputs": [{"type": o.type, "path": o.path} for o in outputs],
     }
+
+
+@app.delete("/jobs/{job_id}")
+async def delete_job(job_id: str):
+    """Delete a job and its associated data."""
+    # Check execution status - for now we just delete from DB
+    q_job = select(Job).where(Job.id == job_id)
+    job = await database.fetch_one(q_job)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Delete related data
+    await database.execute(delete(Output).where(Output.jobId == job_id))
+    await database.execute(delete(Segment).where(Segment.jobId == job_id))
+    
+    # Delete job
+    await database.execute(delete(Job).where(Job.id == job_id))
+    
+    return {"status": "deleted", "id": job_id}
 
 
 async def event_generator(job_id: str, request: Request) -> AsyncGenerator[str, None]:
