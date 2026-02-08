@@ -10,8 +10,8 @@
 - **Job Queue System**: Resumable batch processing with crash recovery, dirty detection, and parallel execution
 - **Robust Rendering**: Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
 - **Mission Control Web UI**: Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
-- **Fully Configurable**: 🚧 **IN PROGRESS** - YAML-based configuration with CLI flag overrides and Pydantic validation
-- **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
+- **Fully Configurable**: YAML-based configuration, CLI flag overrides, Pydantic validation, and a full Preset UX (quick switch, save/update, import/export, manage drawer)
+- **Demo Mode**: 🚧 **IN PROGRESS** - Zero-friction one-command validation with bundled synthetic test video
 - **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
 
 ## Installation
@@ -79,14 +79,19 @@ Once both are running, open [http://localhost:3000](http://localhost:3000) in yo
 - Job History & Persistence
 - Deep-linking to results
 
-### 3. Fully Configurable 🚧 **IN PROGRESS**
+### 3. Fully Configurable ✨ **DONE**
+
 - YAML-based configuration
 - CLI flag overrides
 - Pydantic validation
 - Dynamic config injection into Web UI
+- Preset UX: quick switch, dirty tracking, save/update, import/export, manage drawer
 
-### 4. Output Format Support (WebM/VP9)
-### 5. TTS Narration Overlay
+### 4. Demo Mode 🚧 **IN PROGRESS**
+
+### 5. Output Format Support (WebM/VP9)
+
+### 6. TTS Narration Overlay
 
 ## Repo Tour (Folder Structure + Golden Path)
 

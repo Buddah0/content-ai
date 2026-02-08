@@ -58,69 +58,62 @@ def format_timestamp(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
-def render_16_9(source_path: str, output_path: str, user_config: Dict):
+def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_path: str = None):
     """
     Apply Watermark + Captions to 16:9 source.
     """
-    # Watermark
-    # 18% width, padding 32px
-    if os.path.exists(WATERMARK_PATH):
-        # We need to load watermark as input 1
-        pass
+    show_watermark = user_config.get("showWatermark", False)
+    show_captions = user_config.get("showCaptions", False)
 
     cmd = [get_ffmpeg_cmd(), "-y", "-i", source_path]
-
-    filter_complex = ""
     inputs = 1
-
-    # Add Watermark Input
-    if os.path.exists(WATERMARK_PATH):
+    
+    filters = []
+    video_map = "[0:v]"
+    
+    if show_watermark and os.path.exists(WATERMARK_PATH):
+        wm_input_idx = inputs
+        # Scale watermark
+        filters.append(f"[{wm_input_idx}:v]scale=1920*0.18:-1[wm]")
+        # Overlay
+        filters.append(f"{video_map}[wm]overlay=32:32[v_wm]")
+        video_map = "[v_wm]"
+        inputs += 1 # We consumed an input
+        
+    if show_captions and captions_path and os.path.exists(captions_path):
+        filters.append(f"{video_map}subtitles='{captions_path}'[v_out]")
+        video_map = "[v_out]"
+        
+    if show_watermark and os.path.exists(WATERMARK_PATH):
         cmd.extend(["-i", WATERMARK_PATH])
-        # Scale watermark to 18% of video width
-        # Overlay top-left with padding 32
-        # We can assume 1920x1080 for now or use scale2ref
-        # [1:v][0:v]scale2ref=w=iw*0.18:h=ow/mdar[wm][vid];[wm]setsar=1[wm_scaled] ...
-        # Simpler: just use overlay
 
-        # [1:v]scale=iw*0.18:-1[wm];[0:v][wm]overlay=32:32
-        filter_complex += "[1:v]scale=1920*0.18:-1[wm];[0:v][wm]overlay=32:32"
-        inputs += 1
+    if filters:
+        cmd.extend(["-filter_complex", ";".join(filters), "-map", video_map])
     else:
-        filter_complex += "[0:v]null"  # No-op if missing
+        cmd.extend(["-map", "0:v"])
 
-    # Add Subtitles (Burn-in)
-    # filter_complex += ",subtitles=captions.ass"
-    # Note: creating temp ass file in the main flow
-
-    if os.path.exists("captions.ass"):
-        # If filter_complex was just null, replace it
-        if filter_complex == "[0:v]null":
-            filter_complex = "subtitles=captions.ass"
-        else:
-            filter_complex += ",subtitles=captions.ass"
-
-    cmd.extend(["-filter_complex", filter_complex, "-c:v", "libx264", "-c:a", "copy", output_path])
+    cmd.extend(["-c:v", "libx264", "-c:a", "copy", output_path])
 
     print(f"Rendering 16:9: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
 
-def render_9_16(source_path: str, output_path: str, user_config: Dict):
+def render_9_16(source_path: str, output_path: str, user_config: Dict, captions_path: str = None):
     """
     Apply Blur BG + Center Crop/Scale + Watermark + Captions.
     Output 1080x1920.
     """
+    show_watermark = user_config.get("showWatermark", False)
+    show_captions = user_config.get("showCaptions", False)
 
     cmd = [get_ffmpeg_cmd(), "-y", "-i", source_path]
+    inputs = 1
 
     # Filter graph construction
     # [0:v]split=2[fg][bg];
     # [bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=30[bg2];
     # [fg]scale=1080:1920:force_original_aspect_ratio=decrease[fg2];
     # [bg2][fg2]overlay=(W-w)/2:(H-h)/2[base];
-
-    # Then watermark on [base]
-    # Then subtitles on [base]
 
     filter_parts = [
         "[0:v]split=2[fg][bg]",
@@ -131,35 +124,23 @@ def render_9_16(source_path: str, output_path: str, user_config: Dict):
 
     current_stream = "[base]"
 
-    if os.path.exists(WATERMARK_PATH):
+    if show_watermark and os.path.exists(WATERMARK_PATH):
         cmd.extend(["-i", WATERMARK_PATH])
+        wm_input_idx = inputs
+        inputs += 1
         # Watermark on 9:16
         # Start from [base] and [1:v]
         # Scale watermark relative to 1080 width (18% = ~194px)
-        # [1:v]scale=1080*0.18:-1[wm];[base][wm]overlay=32:32[base_wm]
-        filter_parts.append("[1:v]scale=1080*0.18:-1[wm]")
+        filter_parts.append(f"[{wm_input_idx}:v]scale=1080*0.18:-1[wm]")
         filter_parts.append(f"{current_stream}[wm]overlay=32:32[wm_out]")
         current_stream = "[wm_out]"
 
-    if os.path.exists("captions.ass"):
-        filter_parts.append(f"{current_stream}subtitles=captions.ass[final]")
+    if show_captions and captions_path and os.path.exists(captions_path):
+        filter_parts.append(f"{current_stream}subtitles='{captions_path}'[final]")
         current_stream = "[final]"
-
-    # If last stream name is internal, map it
-    # If no effects added after base, map base
 
     filter_complex = ";".join(filter_parts)
 
-    # Map the final stream
-    # Wait, if we ended with [final] or [wm_out], we need to map it
-    # But cmd line needs explicit mapping if we name it
-    if not filter_complex.endswith("]"):
-        # Implicit output from last filter? No, standard is to map.
-        # Let's simple format:
-        # We need to map the LAST defined label to output
-        pass
-
-    # Better approach: chain safely
     cmd.extend(
         [
             "-filter_complex",
@@ -191,12 +172,14 @@ def run_mission_control_pipeline(
         user_config = {}
 
     # 1. Detect
-    # Merge user_config with internal defaults
-    rms_threshold = user_config.get("rmsThreshold", 0.1)
-    min_event_duration = user_config.get("minEventDuration", 0.5)
-    context_padding = user_config.get("contextPadding", 0.5)
-    merge_gap = user_config.get("mergeGap", 1.0)
-    max_segment_duration = user_config.get("maxSegmentDuration", 10.0)
+    # Read from nested config structure (matches ContentAIConfig model_dump)
+    det = user_config.get("detection", {})
+    proc = user_config.get("processing", {})
+    rms_threshold = det.get("rms_threshold", 0.1)
+    min_event_duration = det.get("min_event_duration_s", 0.5)
+    context_padding = proc.get("context_padding_s", 0.5)
+    merge_gap = proc.get("merge_gap_s", 1.0)
+    max_segment_duration = proc.get("max_segment_duration_s", 10.0)
 
     config = {
         "detection": {"rms_threshold": rms_threshold, "min_event_duration_s": min_event_duration},
@@ -226,15 +209,25 @@ def run_mission_control_pipeline(
     build_montage_from_list(segment_files, concat_path)
 
     # Mock Captions
-    ass_path = os.path.join(output_dir, "captions.ass")  # Use output_dir to avoid conflicts
-    generate_ass_captions(segments, ass_path)
+    show_captions = user_config.get("showCaptions", False)
+    ass_path = os.path.join(output_dir, "captions.ass")
+    
+    if show_captions:
+        generate_ass_captions(segments, ass_path)
+    else:
+        # Ensure we don't accidentally use stale captions if we didn't generate them
+        if os.path.exists(ass_path):
+             try:
+                 os.remove(ass_path)
+             except OSError:
+                 pass
 
     # 3. Outputs
     out_16_9 = os.path.join(output_dir, "output_16_9.mp4")
-    render_16_9(concat_path, out_16_9, user_config)
+    render_16_9(concat_path, out_16_9, user_config, captions_path=ass_path)
 
     out_9_16 = os.path.join(output_dir, "output_9_16.mp4")
-    render_9_16(concat_path, out_9_16, user_config)
+    render_9_16(concat_path, out_9_16, user_config, captions_path=ass_path)
 
     return [out_16_9, out_9_16], segments
 

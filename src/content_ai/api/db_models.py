@@ -52,3 +52,16 @@ class Output(Base):
     path = Column(String)
     type = Column(String)  # "16:9" or "9:16"
     jobId = Column(String, ForeignKey("Job.id"))  # noqa: N815
+
+
+class ConfigPreset(Base):
+    """Global configuration preset storing overrides only."""
+    __tablename__ = "ConfigPreset"
+    id = Column(String, primary_key=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    description = Column(String, nullable=True)
+    overrides = Column(String, nullable=False)  # JSON string of overrides
+    schema_version = Column(Integer, nullable=False, default=1)
+    createdAt = Column(DateTime, default=datetime.utcnow)  # noqa: N815
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # noqa: N815
+
