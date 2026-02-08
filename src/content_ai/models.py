@@ -176,6 +176,11 @@ class ContentAIConfig(BaseModel):
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     rendering: RenderingConfig = Field(default_factory=RenderingConfig)
+    seed: int = Field(
+        default=42,
+        ge=0,
+        description="Global RNG seed for deterministic output",
+    )
 
     @classmethod
     def from_dict(cls, data: dict) -> "ContentAIConfig":
@@ -198,6 +203,8 @@ class ContentAIConfig(BaseModel):
             config_dict["output"]["order"] = cli_args["order"]
         if "keep_temp" in cli_args:
             config_dict["output"]["keep_temp"] = cli_args["keep_temp"]
+        if "seed" in cli_args:
+            config_dict["seed"] = cli_args["seed"]
 
         # Return new validated instance
         return ContentAIConfig.from_dict(config_dict)

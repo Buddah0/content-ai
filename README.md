@@ -100,9 +100,17 @@ Once both are running, open [http://localhost:3000](http://localhost:3000) in yo
 - Always recursive, always queue pipeline
 - All existing subcommands unchanged (backward compatible)
 
-### 6. Output Format Support (WebM/VP9)
+### 6. Deterministic Output Formalization ✨ **DONE**
 
-### 6. TTS Narration Overlay
+- Content-addressable segment IDs (SHA-256 based, 12-char hex)
+- Seeded RNG for demo audio generation
+- `--seed` CLI flag for global RNG control
+- Programmatic verification tests (`tests/test_determinism.py`)
+- Documented determinism contract in ARCHITECTURE.md
+
+### 7. Output Format Support (WebM/VP9)
+
+### 8. TTS Narration Overlay
 
 ## Repo Tour (Folder Structure + Golden Path)
 
@@ -675,8 +683,10 @@ poetry export -f requirements.txt --without-hashes -o requirements.txt
 
 ### Determinism and Reproducibility
 
-- **Processing**: Mostly deterministic given identical inputs and configs
-- **External factors**: FFmpeg build version and thread scheduling can introduce minor variation
+- **Processing**: Fully deterministic given identical inputs, config, and seed
+- **Segment IDs**: Content-addressable (SHA-256 of source_path:start:end:score)
+- **Verification**: Programmatic tests in `tests/test_determinism.py`
+- **External factors**: FFmpeg build version and thread scheduling can introduce minor variation in rendered video (but `segments.json` is byte-identical)
 - **Reproducibility**: Pin dependencies via `poetry.lock` and use identical `config/default.yaml` to reproduce runs
 - **Run metadata**: `resolved_config.json` captures exact runtime config for each run
 

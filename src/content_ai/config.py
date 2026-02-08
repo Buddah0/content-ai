@@ -95,5 +95,7 @@ def resolve_config(cli_args: Dict[str, Any] = None) -> Union[ContentAIConfig, Di
             config_data.setdefault("output", {})["keep_temp"] = cli_args["keep_temp"]
         if cli_args.get("order") is not None:
             config_data.setdefault("output", {})["order"] = cli_args["order"]
+        if cli_args.get("seed") is not None:
+            config_data["seed"] = cli_args["seed"]
 
         return config_data
