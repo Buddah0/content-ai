@@ -250,19 +250,16 @@ async def create_preset(data: PresetCreate):
             updatedAt=datetime.utcnow(),
         )
         await database.execute(query)
-    except Exception as e:
-        # Check for unique constraint violation
-        if "UNIQUE constraint failed" in str(e) or "unique" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "PRESET_NAME_TAKEN",
-                    "message": "Preset name already exists",
-                    "name": data.name,
-                },
-            )
-        raise
-    
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PRESET_NAME_TAKEN",
+                "message": "Preset name already exists",
+                "name": data.name,
+            },
+        )
+
     # Fetch and return the created preset
     query = select(ConfigPreset).where(ConfigPreset.id == preset_id)
     preset = await database.fetch_one(query)
@@ -300,18 +297,16 @@ async def update_preset(preset_id: str, data: PresetUpdate):
     try:
         query = update(ConfigPreset).where(ConfigPreset.id == preset_id).values(**update_values)
         await database.execute(query)
-    except Exception as e:
-        if "UNIQUE constraint failed" in str(e) or "unique" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "PRESET_NAME_TAKEN",
-                    "message": "Preset name already exists",
-                    "name": data.name,
-                },
-            )
-        raise
-    
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PRESET_NAME_TAKEN",
+                "message": "Preset name already exists",
+                "name": data.name,
+            },
+        )
+
     # Fetch and return updated preset
     query = select(ConfigPreset).where(ConfigPreset.id == preset_id)
     preset = await database.fetch_one(query)
@@ -381,17 +376,15 @@ async def import_preset(data: dict):
             updatedAt=datetime.utcnow(),
         )
         await database.execute(query)
-    except Exception as e:
-        if "UNIQUE constraint failed" in str(e) or "unique" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "PRESET_NAME_TAKEN",
-                    "message": "Preset name already exists",
-                    "name": name,
-                },
-            )
-        raise
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PRESET_NAME_TAKEN",
+                "message": "Preset name already exists",
+                "name": name,
+            },
+        )
     
     query = select(ConfigPreset).where(ConfigPreset.id == preset_id)
     preset = await database.fetch_one(query)
@@ -477,7 +470,10 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
     from content_ai.models import ContentAIConfig
     try:
         validated = ContentAIConfig.from_dict(merged)
-        resolved_config = validated.model_dump()
+        # Start from merged dict to preserve extra top-level keys (e.g. showCaptions,
+        # showWatermark) that Pydantic validation would strip, then overlay validated fields.
+        resolved_config = dict(merged)
+        resolved_config.update(validated.model_dump())
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid config: {e}")
 

@@ -219,7 +219,7 @@ def run_mission_control_pipeline(
         if os.path.exists(ass_path):
              try:
                  os.remove(ass_path)
-             except:
+             except OSError:
                  pass
 
     # 3. Outputs
