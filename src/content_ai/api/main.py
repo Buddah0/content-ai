@@ -32,7 +32,9 @@ from content_ai.presets import (
 # --- CONFIG ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./content_ai.db")
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 database = Database(DATABASE_URL)
 
@@ -45,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/outputs", StaticFiles(directory=os.path.join(os.getcwd(), "outputs")), name="outputs")
+app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
 
 app.add_middleware(
     CORSMiddleware,
