@@ -15,7 +15,7 @@ from moviepy.editor import (
 )
 
 
-def generate_demo_video(output_path: str, duration: float = 30.0) -> str:
+def generate_demo_video(output_path: str, duration: float = 30.0, seed: int = 42) -> str:
     """
     Generate a synthetic demo video with percussive audio events.
 
@@ -27,12 +27,16 @@ def generate_demo_video(output_path: str, duration: float = 30.0) -> str:
     Args:
         output_path: Where to save the demo video
         duration: Total duration in seconds
+        seed: RNG seed for deterministic audio generation
 
     Returns:
         Path to the generated demo video
     """
     fps = 24
     sample_rate = 44100
+
+    # Seeded RNG for deterministic demo audio
+    rng = np.random.RandomState(seed)
 
     # Event timestamps (in seconds) - designed to test merging
     # Events at: 2s, 4s (gap=2s, should merge with default merge_gap=2.0)
@@ -43,14 +47,14 @@ def generate_demo_video(output_path: str, duration: float = 30.0) -> str:
     def make_audio(t):
         """Generate audio with percussive spikes at event_times."""
         # Base noise (very quiet)
-        signal = np.random.normal(0, 0.01, len(t))
+        signal = rng.normal(0, 0.01, len(t))
 
         # Add percussive spikes
         for event_time in event_times:
             # Find samples near this event
             event_samples = np.abs(t - event_time) < 0.1  # 100ms spike
             # High amplitude spike
-            signal[event_samples] = np.random.normal(0, 0.3, np.sum(event_samples))
+            signal[event_samples] = rng.normal(0, 0.3, np.sum(event_samples))
 
         # Ensure mono output
         return signal
@@ -84,9 +88,12 @@ def generate_demo_video(output_path: str, duration: float = 30.0) -> str:
     return output_path
 
 
-def get_demo_asset_path() -> Path:
+def get_demo_asset_path(seed: int = 42) -> Path:
     """
     Get or create the demo asset.
+
+    Args:
+        seed: RNG seed for deterministic audio generation.
 
     Returns:
         Path to demo video file.
@@ -97,6 +104,6 @@ def get_demo_asset_path() -> Path:
     if not demo_file.exists():
         print("Demo asset not found. Generating synthetic demo video...")
         assets_dir.mkdir(parents=True, exist_ok=True)
-        generate_demo_video(str(demo_file), duration=30.0)
+        generate_demo_video(str(demo_file), duration=30.0, seed=seed)
 
     return demo_file

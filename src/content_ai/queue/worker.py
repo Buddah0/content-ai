@@ -209,10 +209,9 @@ def process_video_job(
 
         try:
             # Import processing modules (already loaded in worker init)
-            import uuid
-
             from .. import detector, renderer
             from .. import segments as seg_mod
+            from ..hashing import deterministic_segment_id
 
             # 1. Detection phase
             raw_segments = detector.detect_hype(str(video_path), config)
@@ -255,7 +254,9 @@ def process_video_job(
             # Add metadata to segments
             for s in merged:
                 s["source_path"] = str(video_path)
-                s["id"] = str(uuid.uuid4())
+                s["id"] = deterministic_segment_id(
+                    str(video_path), s["start"], s["end"], s.get("score", 0)
+                )
 
             if not merged:
                 # All segments filtered out - still a success

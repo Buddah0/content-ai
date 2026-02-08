@@ -56,3 +56,6 @@ rendering:
   save_artifacts_on_failure: true  # Save logs + reproducible commands
   ffmpeg_loglevel: "info"          # error, warning, info, verbose
   temp_dir: null                   # null = use worker-specific temp dir
+
+# Determinism
+seed: 42  # Global RNG seed (used by demo generation, future stochastic components)

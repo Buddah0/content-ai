@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import uuid
 from pathlib import Path
 from typing import Any, Dict
 
@@ -9,6 +8,7 @@ from . import config as config_lib
 from . import demo as demo_lib
 from . import detector, renderer, scanner
 from . import segments as seg_lib
+from .hashing import deterministic_segment_id
 
 
 def get_run_dir(output_base: str) -> Path:
@@ -40,7 +40,8 @@ def run_scan(cli_args: Dict[str, Any]):
     is_demo = cli_args.get("demo", False)
     if is_demo:
         print("--- 🎬 DEMO MODE ---")
-        demo_asset = demo_lib.get_demo_asset_path()
+        seed = conf.get("seed", 42) if isinstance(conf, dict) else getattr(conf, "seed", 42)
+        demo_asset = demo_lib.get_demo_asset_path(seed=seed)
         cli_args["input"] = str(demo_asset)
         # Force specific output for demo
         cli_args["output"] = "."
@@ -120,7 +121,9 @@ def run_scan(cli_args: Dict[str, Any]):
             # Add metadata
             for s in merged:
                 s["source_path"] = str(v_path)
-                s["id"] = str(uuid.uuid4())
+                s["id"] = deterministic_segment_id(
+                    str(v_path), s["start"], s["end"], s.get("score", 0)
+                )
 
             all_segments.extend(merged)
             print(f"  -> Found {len(merged)} segments.")

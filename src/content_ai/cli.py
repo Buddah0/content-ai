@@ -53,6 +53,7 @@ def _build_default_parser() -> argparse.ArgumentParser:
         choices=["chronological", "score", "hybrid"],
         help="Ordering strategy",
     )
+    parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
     return parser
 
 
@@ -94,6 +95,8 @@ def _run_default_mode(argv: list) -> None:
         cli_dict["max_segments"] = args.max_segments
     if args.order is not None:
         cli_dict["order"] = args.order
+    if args.seed is not None:
+        cli_dict["seed"] = args.seed
 
     queued_pipeline.run_queued_scan(cli_dict)
 
@@ -128,6 +131,7 @@ def _run_subcommand_mode() -> None:
     scan_parser.add_argument(
         "--keep-temp", action="store_true", help="Keep intermediate clip files"
     )
+    scan_parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
 
     # CHECK FFMPEG
     subparsers.add_parser("check", help="Verify dependencies")
@@ -159,6 +163,7 @@ def _run_subcommand_mode() -> None:
         choices=["chronological", "score", "hybrid"],
         help="Ordering strategy",
     )
+    process_parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
 
     # QUEUE subcommands (status, retry, clear)
     queue_parser = subparsers.add_parser("queue", help="Manage job queue")

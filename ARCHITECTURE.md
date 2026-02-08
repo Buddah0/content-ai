@@ -319,23 +319,47 @@ Resume support: skip cached jobs, re-process dirty jobs
 
 ### Determinism
 
-**Goal:** Same inputs + same config → same outputs
+**Contract:** Same inputs + same config + same seed → identical outputs (byte-for-byte `segments.json`).
 
 **Achieved By:**
-- Fixed RMS threshold (no adaptive thresholding)
+- Fixed RMS threshold (no adaptive randomness in detection)
 - Fixed HPSS margins
-- Deterministic segment ordering (chronological or score-based)
-- Fixed codecs and presets (libx264, aac, ultrafast)
+- Deterministic segment ordering (chronological or score-based, with stable multi-key sorts)
+- Fixed codecs and presets (libx264, aac)
 - Tie-breaking rules (first encountered wins on equal scores)
+- Content-addressable segment IDs (SHA-256 of source_path:start:end:score, 12-char hex)
+- Alphabetical file scanning (scanner.py sorts by string path)
+- Config hashing uses sorted JSON keys
+- Demo audio uses seeded RNG (np.random.RandomState with configurable seed)
+
+**Segment ID Scheme:**
+Segment IDs are deterministic, content-addressable hashes:
+```
+id = sha256(f"{source_path}:{start:.6f}:{end:.6f}:{score:.6f}")[:12]
+```
+This produces a 12-character hex string (48 bits). IDs are unique within a run and stable across runs.
+
+**Seed Propagation:**
+The `seed` config field (default: 42) is propagated to all stochastic components. Currently
+used by demo audio generation. Available via `--seed` CLI flag for override.
 
 **External Factors (Non-Deterministic):**
-- FFmpeg build version (minor encoding differences)
-- Thread scheduling (parallel processing order varies)
-- File system timestamps (run directory names)
+- FFmpeg build version (minor encoding differences in rendered video)
+- Thread scheduling in queue-based pipeline (processing order varies, but per-file results are identical)
+- File system timestamps (run directory names like run_001/)
+- Operational IDs (queue job_ids use uuid4, but these are not in output artifacts)
+
+**Verification:**
+The `tests/test_determinism.py` test suite programmatically verifies:
+- Content-addressable segment IDs produce identical results on identical inputs
+- Full pipeline (pad → clamp → merge → id) produces identical output across runs
+- Segment IDs are unique within a run
+- Segment ordering is stable
+- Input ordering does not affect output
 
 **Reproducibility:**
 - Pin dependencies via `poetry.lock`
-- Use identical `config/default.yaml`
+- Use identical `config/default.yaml` + same `--seed`
 - Capture resolved config in `resolved_config.json`
 
 ### Safety
