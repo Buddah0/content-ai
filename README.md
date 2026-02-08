@@ -11,7 +11,8 @@
 - **Robust Rendering**: Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
 - **Mission Control Web UI**: Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
 - **Fully Configurable**: YAML-based configuration, CLI flag overrides, Pydantic validation, and a full Preset UX (quick switch, save/update, import/export, manage drawer)
-- **Demo Mode**: 🚧 **IN PROGRESS** - Zero-friction one-command validation with bundled synthetic test video
+- **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
+- **Zero-Friction CLI**: Auto-discover videos and process with `content-ai` — no subcommand or flags required
 - **Deterministic Output**: Reproducible results with consistent naming, thresholds, and segment ordering
 
 ## Installation
@@ -87,9 +88,19 @@ Once both are running, open [http://localhost:3000](http://localhost:3000) in yo
 - Dynamic config injection into Web UI
 - Preset UX: quick switch, dirty tracking, save/update, import/export, manage drawer
 
-### 4. Demo Mode 🚧 **IN PROGRESS**
+### 4. Demo Mode ✨ **DONE**
 
-### 5. Output Format Support (WebM/VP9)
+- Synthetic test video with known percussive spikes
+- Zero-friction pipeline validation via `content-ai scan --demo`
+
+### 5. Zero-Friction CLI ✨ **DONE**
+
+- `content-ai` with no args auto-discovers videos in CWD
+- Positional path: `content-ai ./videos` or `content-ai clip.mp4`
+- Always recursive, always queue pipeline
+- All existing subcommands unchanged (backward compatible)
+
+### 6. Output Format Support (WebM/VP9)
 
 ### 6. TTS Narration Overlay
 
@@ -298,6 +309,24 @@ Resume support: skip cached jobs, re-process dirty jobs
 
 ## Usage
 
+### Quick Start (Zero-Friction Mode)
+
+Just run `content-ai` in a folder with videos — it auto-discovers files, processes them through the queue pipeline with recursive scanning, and generates montages with sensible defaults.
+
+```bash
+# Auto-discover videos in current directory
+content-ai
+
+# Process a specific folder or file
+content-ai ./videos
+content-ai clip.mp4
+
+# With options
+content-ai ./videos -w 4 -f --rms-threshold 0.15
+```
+
+Run `content-ai --help` to see all available options and subcommands.
+
 ### Basic Commands
 
 **Check dependencies:**
@@ -310,7 +339,7 @@ poetry run content-ai check
 python -m content_ai check
 ```
 
-**Scan a single file:**
+**Scan a single file (sequential pipeline):**
 
 ```bash
 # Poetry
@@ -320,7 +349,7 @@ poetry run content-ai scan --input gameplay.mp4
 python -m content_ai scan --input gameplay.mp4
 ```
 
-**Batch scan (recursive):**
+**Batch scan (recursive, sequential):**
 
 ```bash
 # Poetry

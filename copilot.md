@@ -107,13 +107,25 @@ Every operation must print:
 - Warnings (skipped files, missing audio tracks)
 - Success summary (output path, segment count)
 
-### Commands:
-```bash
-# Full pipeline
-python -m content_ai scan /path/to/videos --output highlights.mp4
+### Default Mode (Zero-Friction)
 
-# One-command demo (milestone target)
-python -m content_ai scan --demo
+```bash
+content-ai              # auto-discover in CWD, recursive, queue pipeline
+content-ai ./videos     # auto-discover in path, recursive, queue pipeline
+content-ai clip.mp4     # process single file via queue pipeline
+```
+
+Default mode always uses queue pipeline with recursive scanning ON.
+Routing: `cli.py` pre-inspects `argv[1]` before argparse runs.
+If `argv[1]` is a known subcommand (`scan`, `process`, `queue`, `check`), routes to existing flow.
+Otherwise, routes to default mode parser.
+
+### Subcommands (Advanced)
+
+```bash
+content-ai scan --input /path/to/videos   # sequential pipeline
+content-ai process --input /path/to/videos # queue pipeline (explicit)
+content-ai scan --demo                     # demo mode
 ```
 
 ---
