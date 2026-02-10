@@ -690,3 +690,14 @@ def validate_segment_compatibility(
             return False
 
     return True
+
+
+def has_audio(video_path: str) -> bool:
+    """Check if video file has at least one audio stream."""
+    try:
+        # We can use probe_video for this as it already extracts audio info
+        meta = probe_video(video_path)
+        # probe_video returns None for audio_codec if no audio stream found
+        return meta.audio_codec is not None
+    except Exception:
+        return False
