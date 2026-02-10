@@ -54,6 +54,9 @@ class OutputConfig(BaseModel):
     order: Literal["chronological", "score", "hybrid"] = Field(
         default="chronological", description="Sorting strategy for output segments"
     )
+    output_format: Literal["mp4", "webm"] = Field(
+        default="mp4", description="Output container format (mp4=H.264/AAC, webm=VP9/Opus)"
+    )
     keep_temp: bool = Field(default=False, description="Whether to keep intermediate clip files")
 
 
@@ -201,6 +204,8 @@ class ContentAIConfig(BaseModel):
             config_dict["output"]["max_segments"] = cli_args["max_segments"]
         if "order" in cli_args:
             config_dict["output"]["order"] = cli_args["order"]
+        if "output_format" in cli_args:
+            config_dict["output"]["output_format"] = cli_args["output_format"]
         if "keep_temp" in cli_args:
             config_dict["output"]["keep_temp"] = cli_args["keep_temp"]
         if "seed" in cli_args:

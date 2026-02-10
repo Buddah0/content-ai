@@ -6,8 +6,6 @@ output given identical inputs and configuration.
 
 import random
 
-import pytest
-
 from content_ai.hashing import deterministic_segment_id
 from content_ai.segments import clamp_segments, merge_segments, pad_segments
 

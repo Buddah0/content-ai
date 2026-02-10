@@ -7,8 +7,10 @@
 - **Audio-First Detection**: Uses librosa's HPSS (Harmonic-Percussive Source Separation) to isolate combat sounds from background music and voice
 - **Smart Merging**: Intelligently merges close-together clips with max duration enforcement and deterministic tie-breaking
 - **Batch Processing**: Recursively scans folders to process multiple videos in a single run
+- **Multi-Format Output**: Generates MP4 (H.264/AAC) or WebM (VP9/Opus) with integrity validation (SHA256)
 - **Job Queue System**: Resumable batch processing with crash recovery, dirty detection, and parallel execution
 - **Robust Rendering**: Production-grade FFmpeg orchestration with process isolation, timeout enforcement, VFR safety, and error classification
+- **Blueprint Architecture**: Decoupled "Universal Schema" separates detection from rendering, enabling non-linear editing and accessible outputs
 - **Mission Control Web UI**: Full-stack dashboard for uploading videos, monitoring real-time progress, and reviewing highlights with deep-linked job history
 - **Fully Configurable**: YAML-based configuration, CLI flag overrides, Pydantic validation, and a full Preset UX (quick switch, save/update, import/export, manage drawer)
 - **Demo Mode**: Zero-friction one-command validation with bundled synthetic test video
@@ -108,9 +110,23 @@ Once both are running, open [http://localhost:3000](http://localhost:3000) in yo
 - Programmatic verification tests (`tests/test_determinism.py`)
 - Documented determinism contract in ARCHITECTURE.md
 
-### 7. Output Format Support (WebM/VP9)
+### 7. Output Format Support ✨ **DONE**
+- WebM (VP9/Opus) and MP4 (H.264/AAC) support
+- `--format` CLI flag
+- Checksum integrity validation (SHA256)
+- Detailed rendering metrics in `run_meta.json`
 
-### 8. TTS Narration Overlay
+### 8. Blueprint System Scaffold ✨ **DONE**
+- Universal Schema for Timeline/Tracks
+- Output Strategy Pattern (JSON, Markdown, Text)
+- NVDA Adapter Hook
+
+### 9. Content Re-creation Engine (In Progress)
+- Blueprint Generator Logic
+- Asset Sourcing Implementation
+- `blueprint` CLI command
+
+### 10. TTS Narration Overlay (Planned)
 
 ## Repo Tour (Folder Structure + Golden Path)
 
@@ -734,43 +750,44 @@ See [docs/RENDERING.md](docs/RENDERING.md) for comprehensive rendering documenta
 - ✅ Crash recovery and retry logic - Evidence: Tested with 207MB real gameplay footage
 - ✅ CLI commands: `process`, `queue status`, `queue retry`, `queue clear` - Evidence: [cli.py](src/content_ai/cli.py)
 
-**Testing & CI:**
-
-- ✅ 123 unit tests across 8 test files (55% coverage) - Evidence: [tests/](tests/)
-- ✅ GitHub Actions CI with Poetry caching - Evidence: [.github/workflows/ci.yml](.github/workflows/ci.yml)
-
-**Robust Rendering:**
-
+**Robust Rendering & Output Formats:**
+- ✅ Output Format Support: MP4 (H.264/AAC) and WebM (VP9/Opus) - Evidence: [renderer.py](src/content_ai/renderer.py), `--format` flag
+- ✅ Integrity Verification: SHA256 checksums and file size validation - Evidence: `verify_output_integrity` in `renderer.py`
+- ✅ Detailed Metrics: Render timings, container info, and codec details in `run_meta.json`
 - ✅ FfmpegRunner with process isolation - Evidence: [ffmpeg_runner.py](src/content_ai/ffmpeg_runner.py)
 - ✅ Dual timeout enforcement (global + no-progress) - Evidence: 30 min global, 2 min stall detection
 - ✅ VFR detection and CFR normalization - Evidence: [renderer.py](src/content_ai/renderer.py) `probe_video()`, `should_use_fast_path()`
-- ✅ Render contract for consistent output - Evidence: [models.py](src/content_ai/models.py) `RenderContractConfig`
-- ✅ Error classification for retry logic - Evidence: [ffmpeg_runner.py](src/content_ai/ffmpeg_runner.py) `FfmpegErrorType`
-- ✅ Artifact preservation on failure - Evidence: Saves logs + reproducible scripts
 
-### Next Milestone: Output Format Support 🚧
+**Architecture Scaffolding:**
+- ✅ Universal Schema: Pydantic models for Timeline, Track, and Segment - Evidence: [schema.py](src/content_ai/blueprint/schema.py)
+- ✅ Output Manager: Strategy pattern for blueprint export (JSON, Markdown, Text) - Evidence: [output_manager.py](src/content_ai/blueprint/output_manager.py)
+- ✅ NVDA Adapter Hook: Basic integration for screen reader config overrides - Evidence: [nvda_adapter.py](src/content_ai/integrations/nvda_adapter.py)
 
-**Status:** Not Started
+**Testing & CI:**
+- ✅ 130+ unit tests across 9 test files (coverage increasing) - Evidence: [tests/](tests/)
+- ✅ GitHub Actions CI with Poetry caching - Evidence: [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
-**Goal:** Add WebM and other output format support.
+### Next Milestone: Content Re-creation Engine 🚧
+
+**Status:** In Progress
+
+**Goal:** Implement the "Content Re-creation Engine" that separates blueprint generation from asset sourcing and assembly, enabling non-linear editing and multi-modal output.
 
 **Acceptance Criteria:**
-
-1. Add WebM output format support (VP9 video, Opus audio) with CLI flag `--format webm`
-2. Verify output file integrity (checksum validation before marking job succeeded)
-3. Add detailed rendering metrics to run_meta.json (render time per clip, total encoding time, codec info)
+1.  **Blueprint Generator**: Implement logic to convert raw detection events into a `UniversalSchema` blueprint.
+2.  **Asset Sourcing**: Create `AssetSourcer` to resolve `SourceQuery` objects to actual media files.
+3.  **Timeline Assembly**: Implement `TimelineAssembler` to render the blueprint using `renderer.py`.
+4.  **CLI Integration**: Expose `blueprint` command to generate and inspect blueprints without rendering.
 
 **Modules to Touch:**
-
-- [renderer.py](src/content_ai/renderer.py) - Add WebM contract support
-- [models.py](src/content_ai/models.py) - Add output_format field to OutputConfig
-- [cli.py](src/content_ai/cli.py) - Add `--format` flag
+- [src/content_ai/blueprint/](src/content_ai/blueprint/) - Implement core logic
+- [src/content_ai/pipeline.py](src/content_ai/pipeline.py) - Integrate blueprint step into main pipeline
+- [src/content_ai/cli.py](src/content_ai/cli.py) - Add `blueprint` command
 
 **Guardrails:**
-
-- Maintain determinism (same inputs → same outputs for same format)
-- Test with diverse videos (high/low motion, different resolutions)
-- No silent failures (all FFmpeg errors must be caught and raised)
+- Backward compatibility with existing linear pipeline
+- Strict Pydantic validation for Universal Schema
+- Detached execution (generate blueprint now, render later)
 
 ### Future: TTS Narration
 

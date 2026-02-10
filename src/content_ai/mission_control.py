@@ -67,10 +67,10 @@ def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_
 
     cmd = [get_ffmpeg_cmd(), "-y", "-i", source_path]
     inputs = 1
-    
+
     filters = []
     video_map = "[0:v]"
-    
+
     if show_watermark and os.path.exists(WATERMARK_PATH):
         wm_input_idx = inputs
         # Scale watermark
@@ -79,11 +79,11 @@ def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_
         filters.append(f"{video_map}[wm]overlay=32:32[v_wm]")
         video_map = "[v_wm]"
         inputs += 1 # We consumed an input
-        
+
     if show_captions and captions_path and os.path.exists(captions_path):
         filters.append(f"{video_map}subtitles='{captions_path}'[v_out]")
         video_map = "[v_out]"
-        
+
     if show_watermark and os.path.exists(WATERMARK_PATH):
         cmd.extend(["-i", WATERMARK_PATH])
 
@@ -211,7 +211,7 @@ def run_mission_control_pipeline(
     # Mock Captions
     show_captions = user_config.get("showCaptions", False)
     ass_path = os.path.join(output_dir, "captions.ass")
-    
+
     if show_captions:
         generate_ass_captions(segments, ass_path)
     else:

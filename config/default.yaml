@@ -15,6 +15,7 @@ output:
   max_duration_s: 90
   max_segments: 12
   order: "chronological" # chronological, score, hybrid
+  output_format: "mp4"    # mp4, webm
   keep_temp: false
 
 # Rendering Configuration (FFmpeg Runner + VFR Safety)

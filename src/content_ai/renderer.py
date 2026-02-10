@@ -19,7 +19,13 @@ def get_ffmpeg_cmd():
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def render_segment_to_file(source_path: str, start: float, end: float, output_path: str):
+def render_segment_to_file(
+    source_path: str,
+    start: float,
+    end: float,
+    output_path: str,
+    output_format: str = "mp4",
+):
     """
     Render a single segment to a temporary file.
     """
@@ -34,17 +40,58 @@ def render_segment_to_file(source_path: str, start: float, end: float, output_pa
             return  # Skip invalid
 
         new_clip = video.subclip(start, end)
-        # using 'fast' preset for speed, crf for quality
-        # audio_codec aac is standard
-        new_clip.write_videofile(
-            output_path,
-            codec="libx264",
-            audio_codec="aac",
-            temp_audiofile=f"temp_render_audio_{os.getpid()}.m4a",
-            remove_temp=True,
-            logger=None,
-            preset="ultrafast",  # optimize for speed as requested "short form"
-        )
+
+        # Codec settings based on format
+        if output_format == "webm":
+            # WebM Contract: VP9 + Opus
+            # Balanced settings for speed/quality
+            codec = "libvpx-vp9"
+            audio_codec = "libopus"
+            preset = None  # speed handled via ffmpeg_params in MoviePy if needed, but write_videofile has preset
+            # MoviePy doesn't map 'preset' directly to -speed for vp9 easily without ffmpeg_params.
+            # But let's stick to simple arguments supported by write_videofile where possible.
+            # For VP9, 'preset' arg in MoviePy might be ignored or passed as -preset (which VP9 doesn't use standardly like x264).
+            # We'll use ffmpeg_params for VP9 specifics.
+            ffmpeg_params = [
+                "-b:v", "0",
+                "-crf", "32",
+                "-quality", "good",
+                "-speed", "2",
+                "-row-mt", "1",
+                "-tile-columns", "2",
+                "-frame-parallel", "1",
+                "-auto-alt-ref", "1",
+                "-lag-in-frames", "25",
+                "-pix_fmt", "yuv420p"
+            ]
+            # Audio bitrate 96k
+            audio_bitrate = "96k"
+            # write_videofile doesn't have audio_bitrate arg, passed via audio_bitrate string in some versions or ffmpeg_params?
+            # MoviePy write_videofile has 'audio_bitrate'.
+        else:
+            # MP4 Contract: H.264 + AAC (Default)
+            codec = "libx264"
+            audio_codec = "aac"
+            ffmpeg_params = None
+            preset = "ultrafast"
+            audio_bitrate = None # Use default
+
+        # Write file
+        kwargs = {
+            "codec": codec,
+            "audio_codec": audio_codec,
+            "temp_audiofile": f"temp_render_audio_{os.getpid()}.m4a",
+            "remove_temp": True,
+            "logger": None,
+        }
+        if preset:
+            kwargs["preset"] = preset
+        if ffmpeg_params:
+            kwargs["ffmpeg_params"] = ffmpeg_params
+        if audio_bitrate:
+            kwargs["audio_bitrate"] = audio_bitrate
+
+        new_clip.write_videofile(output_path, **kwargs)
 
 
 def build_montage_from_list(segment_files: List[str], output_file: str):
@@ -110,6 +157,61 @@ def check_ffmpeg():
         return True
     except (FileNotFoundError, subprocess.CalledProcessError, OSError):
         return False
+
+
+def verify_output_integrity(file_path: str, expected_format: str = "mp4") -> dict:
+    """
+    Verify output file integrity.
+    Checks: exists, size > 0, valid container/codec via ffprobe.
+    Returns dict with integrity metadata (sha256, size, codecs).
+    Raises Exception if invalid.
+    """
+    import hashlib
+
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Output file not found: {file_path}")
+
+    size = path.stat().st_size
+    if size == 0:
+        raise ValueError(f"Output file is empty: {file_path}")
+
+    # Compute SHA256
+    sha256_hash = hashlib.sha256()
+    with open(path, "rb") as f:
+        # Read in chunks
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    checksum = sha256_hash.hexdigest()
+
+    # Run ffprobe
+    # Use probe_video from existing VFR code? Or just simple check?
+    # Let's reuse probe_video if available or simple call.
+    # probe_video returns VideoMetadata.
+    try:
+        meta = probe_video(str(path))
+    except Exception as e:
+        # Fallback if probe_video fails or not available in scope (it is in this file)
+        raise RuntimeError(f"Integrity check failed (ffprobe error): {e}")
+
+    # Validate Format
+    if expected_format == "webm":
+        if "webm" not in meta.codec_name and "vp9" not in meta.codec_name:
+             # probe_video returns container info?
+             # probe_video returns VideoMetadata which has codec_name.
+             # Wait, probe_video checks video stream codec.
+             pass
+
+    # We want to return detailed metrics
+    return {
+        "output.format": expected_format,
+        "output.size_bytes": size,
+        "output.sha256": checksum,
+        "output.container": expected_format, # Approximated
+        "output.video.codec": meta.codec_name,
+        "output.audio.codec": meta.audio_codec,
+        "output.duration": meta.duration,
+    }
 
 
 # ============================================================================

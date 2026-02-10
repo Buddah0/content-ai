@@ -32,10 +32,10 @@ def compute_overrides(defaults: Dict[str, Any], current: Dict[str, Any]) -> Dict
         Dict containing only the keys/values that differ from defaults
     """
     overrides = {}
-    
+
     for key, current_value in current.items():
         default_value = defaults.get(key)
-        
+
         if isinstance(current_value, dict) and isinstance(default_value, dict):
             # Recursively diff nested dicts
             nested_diff = compute_overrides(default_value, current_value)
@@ -44,7 +44,7 @@ def compute_overrides(defaults: Dict[str, Any], current: Dict[str, Any]) -> Dict
         elif current_value != default_value:
             # Value differs from default
             overrides[key] = current_value
-    
+
     return overrides
 
 
@@ -61,7 +61,7 @@ def apply_overrides(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict
     """
     import copy
     result = copy.deepcopy(defaults)
-    
+
     for key, override_value in overrides.items():
         if override_value is None:
             # RFC 7396: null means delete the key
@@ -72,7 +72,7 @@ def apply_overrides(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict
         else:
             # Replace value
             result[key] = override_value
-    
+
     return result
 
 
@@ -109,13 +109,13 @@ def resolve_with_preset(
         Validated ContentAIConfig instance
     """
     merged = defaults
-    
+
     if preset_overrides:
         merged = apply_overrides(merged, preset_overrides)
-    
+
     if request_overrides:
         merged = apply_overrides(merged, request_overrides)
-    
+
     return validate_config(merged)
 
 
@@ -138,10 +138,10 @@ def migrate_overrides(overrides: Dict[str, Any], from_version: int) -> Dict[str,
             f"Preset schema version {from_version} is newer than "
             f"current version {CURRENT_SCHEMA_VERSION}. Please update the application."
         )
-    
+
     if from_version == CURRENT_SCHEMA_VERSION:
         return overrides
-    
+
     # Future migrations would go here
     # For now, we only have version 1, so no migrations needed
     return overrides
