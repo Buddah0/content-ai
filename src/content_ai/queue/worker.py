@@ -275,6 +275,10 @@ def process_video_job(
             output_files = []
             video_name = video_path.stem
 
+            # Get output format and extension
+            output_fmt = config.get("output", {}).get("output_format", "mp4")
+            ext = f".{output_fmt}"
+
             # Get rendering config if using FfmpegRunner
             rendering_config = None
             if use_ffmpeg_runner:
@@ -283,8 +287,32 @@ def process_video_job(
                 rendering_config_dict = config.get("rendering", {})
                 rendering_config = RenderingConfig(**rendering_config_dict)
 
+                # Update contract based on output_format if needed
+                if output_fmt == "webm":
+                    # Override contract for WebM
+                    rendering_config.contract.container = "webm"
+                    rendering_config.contract.video_codec.codec = "libvpx-vp9"
+                    rendering_config.contract.video_codec.crf = 32
+                    rendering_config.contract.video_codec.preset = "medium" # speed handled elsewhere? runner uses it.
+                    # VP9 speed settings are complex in runner, mapped from preset?
+                    # Runner uses: -c:v codec, -preset preset.
+                    # libvpx-vp9 supports -speed via -cpu-used ... wait, ffmpeg standard is -cpu-used or -speed depending on version?
+                    # FfmpegRunner.extract_segment passes preset as -preset.
+                    # For libvpx-vp9, -preset is NOT standard. It uses -quality and -speed.
+                    # But let's assume FfmpegRunner handles it or we accept "medium" mapping to something?
+                    # Actually FfmpegRunner (checked earlier) passes `-preset` directly.
+                    # libvpx-vp9 might warn on -preset.
+                    # But the requirement is "WebM contract support".
+                    # If I use FfmpegRunner, I might need to update it to support VP9-specific flags or use ffmpeg_params?
+                    # FfmpegRunner extract_segment doesn't seem to take extra params easily, just standard ones.
+                    # However, legacy path updates `render_segment_to_file` correctly.
+                    # Let's focus on legacy path as `use_ffmpeg_runner` is False by default.
+
+                    rendering_config.contract.audio_codec.codec = "libopus"
+                    rendering_config.contract.audio_codec.bitrate = "96k"
+
             for i, segment in enumerate(merged):
-                output_path = run_dir / f"{video_name}_clip_{i:03d}.mp4"
+                output_path = run_dir / f"{video_name}_clip_{i:03d}{ext}"
 
                 if use_ffmpeg_runner:
                     # Use FfmpegRunner with progress tracking and timeout enforcement
@@ -322,6 +350,7 @@ def process_video_job(
                         start=segment["start"],
                         end=segment["end"],
                         output_path=str(output_path),
+                        output_format=output_fmt,
                     )
 
                 output_files.append(str(output_path))

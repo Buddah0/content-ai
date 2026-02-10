@@ -53,6 +53,11 @@ def _build_default_parser() -> argparse.ArgumentParser:
         choices=["chronological", "score", "hybrid"],
         help="Ordering strategy",
     )
+    parser.add_argument(
+        "--format",
+        choices=["mp4", "webm"],
+        help="Output format (mp4=H.264/AAC, webm=VP9/Opus)",
+    )
     parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
     return parser
 
@@ -95,6 +100,8 @@ def _run_default_mode(argv: list) -> None:
         cli_dict["max_segments"] = args.max_segments
     if args.order is not None:
         cli_dict["order"] = args.order
+    if args.format is not None:
+        cli_dict["output_format"] = args.format
     if args.seed is not None:
         cli_dict["seed"] = args.seed
 
@@ -127,6 +134,11 @@ def _run_subcommand_mode() -> None:
         "--order",
         choices=["chronological", "score", "hybrid"],
         help="Ordering strategy",
+    )
+    scan_parser.add_argument(
+        "--format",
+        choices=["mp4", "webm"],
+        help="Output format (mp4=H.264/AAC, webm=VP9/Opus)",
     )
     scan_parser.add_argument(
         "--keep-temp", action="store_true", help="Keep intermediate clip files"
@@ -162,6 +174,11 @@ def _run_subcommand_mode() -> None:
         "--order",
         choices=["chronological", "score", "hybrid"],
         help="Ordering strategy",
+    )
+    process_parser.add_argument(
+        "--format",
+        choices=["mp4", "webm"],
+        help="Output format (mp4=H.264/AAC, webm=VP9/Opus)",
     )
     process_parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
 
@@ -199,6 +216,8 @@ def _run_subcommand_mode() -> None:
     if args.command == "scan":
         # Convert args to dict, filtering None
         cli_dict = {k: v for k, v in vars(args).items() if v is not None}
+        if args.format is not None:
+            cli_dict["output_format"] = args.format
         pipeline.run_scan(cli_dict)
 
     elif args.command == "check":
@@ -212,6 +231,8 @@ def _run_subcommand_mode() -> None:
     elif args.command == "process":
         # Queue-based batch processing
         cli_dict = {k: v for k, v in vars(args).items() if v is not None}
+        if args.format is not None:
+            cli_dict["output_format"] = args.format
         queued_pipeline.run_queued_scan(cli_dict)
 
     elif args.command == "queue":

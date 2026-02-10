@@ -47,7 +47,7 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
             mean_rms = float(rms.mean())
             std_rms = float(rms.std())
             sensitivity = det_conf.get("sensitivity", 2.5)
-            
+
             adaptive_thresh = mean_rms + (sensitivity * std_rms)
             # Use max of adaptive or absolute floor (rms_thresh)
             final_thresh = max(adaptive_thresh, rms_thresh)
@@ -85,11 +85,11 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
                     if seg_dur >= min_dur:
                         # Apply lookback here to capture context *before* the hype event
                         adj_start = max(0.0, start_time - lookback_s)
-                        
+
                         raw_segments.append(
                             {
                                 "start": float(adj_start),
-                                # We extend end slightly? No, end is end of hype. 
+                                # We extend end slightly? No, end is end of hype.
                                 # Often the hype continues (cheers), so end is fine.
                                 "end": float(t),
                                 "score": float(peak_rms),

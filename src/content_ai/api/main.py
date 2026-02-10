@@ -7,7 +7,8 @@ import shutil
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Optional
+from sqlite3 import IntegrityError
+from typing import AsyncGenerator
 
 from databases import Database
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile, status
@@ -16,17 +17,14 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, insert, select, update
-from sqlite3 import IntegrityError
 
 from content_ai.api.db_models import Asset, ConfigPreset, Job, JobStatus, Output, Segment
-from content_ai.mission_control import run_mission_control_pipeline
 from content_ai.config import resolve_config
+from content_ai.mission_control import run_mission_control_pipeline
 from content_ai.presets import (
     CURRENT_SCHEMA_VERSION,
     apply_overrides,
-    compute_overrides,
     migrate_overrides,
-    resolve_with_preset,
 )
 
 # --- CONFIG ---
@@ -240,7 +238,7 @@ async def list_presets():
 async def create_preset(data: PresetCreate):
     """Create a new preset. Name must be unique (409 if taken)."""
     preset_id = str(uuid.uuid4())
-    
+
     try:
         query = insert(ConfigPreset).values(
             id=preset_id,
@@ -286,7 +284,7 @@ async def update_preset(preset_id: str, data: PresetUpdate):
     preset = await database.fetch_one(query)
     if not preset:
         raise HTTPException(status_code=404, detail="Preset not found")
-    
+
     # Build update values
     update_values = {"updatedAt": datetime.utcnow()}
     if data.name is not None:
@@ -295,7 +293,7 @@ async def update_preset(preset_id: str, data: PresetUpdate):
         update_values["description"] = data.description
     if data.overrides is not None:
         update_values["overrides"] = json.dumps(data.overrides)
-    
+
     try:
         query = update(ConfigPreset).where(ConfigPreset.id == preset_id).values(**update_values)
         await database.execute(query)
@@ -322,7 +320,7 @@ async def delete_preset(preset_id: str):
     preset = await database.fetch_one(query)
     if not preset:
         raise HTTPException(status_code=404, detail="Preset not found")
-    
+
     await database.execute(delete(ConfigPreset).where(ConfigPreset.id == preset_id))
     return {"status": "deleted", "id": preset_id}
 
@@ -334,7 +332,7 @@ async def export_preset(preset_id: str):
     preset = await database.fetch_one(query)
     if not preset:
         raise HTTPException(status_code=404, detail="Preset not found")
-    
+
     return {
         "name": preset.name,
         "description": preset.description,
@@ -349,12 +347,12 @@ async def import_preset(data: dict):
     name = data.get("name")
     if not name:
         raise HTTPException(status_code=400, detail="Preset name is required")
-    
+
     preset_id = str(uuid.uuid4())
     overrides = data.get("overrides", {})
     description = data.get("description")
     schema_version = data.get("schema_version", 1)
-    
+
     # Migrate if needed
     if schema_version < CURRENT_SCHEMA_VERSION:
         try:
@@ -366,7 +364,7 @@ async def import_preset(data: dict):
             status_code=400,
             detail=f"Preset schema version {schema_version} is newer than supported version {CURRENT_SCHEMA_VERSION}",
         )
-    
+
     try:
         query = insert(ConfigPreset).values(
             id=preset_id,
@@ -387,7 +385,7 @@ async def import_preset(data: dict):
                 "name": name,
             },
         )
-    
+
     query = select(ConfigPreset).where(ConfigPreset.id == preset_id)
     preset = await database.fetch_one(query)
     return _preset_to_response(preset)
@@ -456,7 +454,7 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         preset = await database.fetch_one(query)
         if not preset:
             raise HTTPException(status_code=404, detail="Preset not found")
-        
+
         # Migrate if needed
         raw_overrides = json.loads(preset.overrides) if preset.overrides else {}
         preset_overrides = migrate_overrides(raw_overrides, preset.schema_version)
@@ -485,7 +483,7 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         "request_overrides": job_data.settings,
         "schema_version": CURRENT_SCHEMA_VERSION,
     }
-    
+
     settings_json = json.dumps({
         "resolved_config": resolved_config,
         "config_source": config_source,
@@ -539,7 +537,7 @@ async def get_job_config(job_id: str):
     job = await database.fetch_one(q_job)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     if job.settings:
         settings_data = json.loads(job.settings)
         return {
@@ -561,10 +559,10 @@ async def delete_job(job_id: str):
     # Delete related data
     await database.execute(delete(Output).where(Output.jobId == job_id))
     await database.execute(delete(Segment).where(Segment.jobId == job_id))
-    
+
     # Delete job
     await database.execute(delete(Job).where(Job.id == job_id))
-    
+
     return {"status": "deleted", "id": job_id}
 
 

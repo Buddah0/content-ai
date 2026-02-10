@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict
 
@@ -192,25 +193,60 @@ def run_scan(cli_args: Dict[str, Any]):
     print(f"Selected {len(final_segments)} segments (Total {total_dur:.2f}s).")
 
     # 7. Render
-    montage_path = demo_output_path if is_demo else (run_dir / "montage.mp4")
+    output_fmt = conf["output"].get("output_format", "mp4")
+    ext = f".{output_fmt}"
+
+    montage_path = demo_output_path if is_demo else (run_dir / f"montage{ext}")
+
+    render_metrics = {}
+
     if final_segments:
         temp_paths = []
         try:
-            print("Rendering clips...")
+            print(f"Rendering clips (format={output_fmt})...")
+            start_time = datetime.datetime.now()
+
+            per_clip_timings = []
+
             for i, seg in enumerate(final_segments):
-                out_name = run_dir / f"clip_{i:03d}.mp4"
+                out_name = run_dir / f"clip_{i:03d}{ext}"
+                t0 = time.perf_counter()
                 renderer.render_segment_to_file(
-                    seg["source_path"], seg["start"], seg["end"], str(out_name)
+                    seg["source_path"],
+                    seg["start"],
+                    seg["end"],
+                    str(out_name),
+                    output_format=output_fmt
                 )
+                dt = time.perf_counter() - t0
+                per_clip_timings.append(dt)
                 temp_paths.append(str(out_name))
 
             print("Building montage...")
+            t0_concat = time.perf_counter()
             try:
                 renderer.build_montage_from_list(temp_paths, str(montage_path))
                 print(f"Montage saved to {montage_path}")
+
+                # Verify integrity
+                print("Verifying output integrity...")
+                integrity = renderer.verify_output_integrity(str(montage_path), expected_format=output_fmt)
+                render_metrics.update(integrity)
+
             except Exception as e:
-                print(f"Failed to build montage: {e}")
-                # Don't re-raise, proceeding to save JSONs
+                print(f"Failed to build montage or verify integrity: {e}")
+                # Don't re-raise, proceeding to save JSONs (but mark success=False in meta?)
+                render_metrics["error"] = str(e)
+
+            total_encode_time = (datetime.datetime.now() - start_time).total_seconds()
+            render_metrics["timings"] = {
+                "per_clip_seconds": per_clip_timings,
+                "total_encode_seconds": total_encode_time,
+                "concat_seconds": time.perf_counter() - t0_concat
+            }
+            render_metrics["render_settings"] = {
+                 "format": output_fmt
+            }
 
         finally:
             if not conf["output"]["keep_temp"]:
@@ -237,11 +273,12 @@ def run_scan(cli_args: Dict[str, Any]):
     # Run Meta
     meta = {
         "timestamp": datetime.datetime.now().isoformat(),
-        "success": True,
+        "success": "error" not in render_metrics,
         "input_count": len(video_files),
         "found_segments_total": len(all_segments),
         "selected_segments": len(final_segments),
         "overrides": cli_args,  # Just dumping CLI args as overrides for now + any others
+        "output": render_metrics # Add detailed metrics
     }
     with open(run_dir / "run_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
