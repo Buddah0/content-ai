@@ -42,9 +42,7 @@ def _build_default_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output", "-o", type=str, default="output", help="Output directory")
     parser.add_argument("--workers", "-w", type=int, help="Number of parallel workers")
-    parser.add_argument(
-        "--force", "-f", action="store_true", help="Reprocess all (ignore cache)"
-    )
+    parser.add_argument("--force", "-f", action="store_true", help="Reprocess all (ignore cache)")
     parser.add_argument("--rms-threshold", type=float, help="Override RMS threshold")
     parser.add_argument("--max-duration", type=float, help="Max montage duration (s)")
     parser.add_argument("--max-segments", type=int, help="Max segments in montage")
@@ -58,7 +56,9 @@ def _build_default_parser() -> argparse.ArgumentParser:
         choices=["mp4", "webm"],
         help="Output format (mp4=H.264/AAC, webm=VP9/Opus)",
     )
-    parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
+    parser.add_argument(
+        "--seed", type=int, help="Global RNG seed for deterministic output (default: 42)"
+    )
     return parser
 
 
@@ -143,7 +143,9 @@ def _run_subcommand_mode() -> None:
     scan_parser.add_argument(
         "--keep-temp", action="store_true", help="Keep intermediate clip files"
     )
-    scan_parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
+    scan_parser.add_argument(
+        "--seed", type=int, help="Global RNG seed for deterministic output (default: 42)"
+    )
 
     # CHECK FFMPEG
     subparsers.add_parser("check", help="Verify dependencies")
@@ -180,7 +182,9 @@ def _run_subcommand_mode() -> None:
         choices=["mp4", "webm"],
         help="Output format (mp4=H.264/AAC, webm=VP9/Opus)",
     )
-    process_parser.add_argument("--seed", type=int, help="Global RNG seed for deterministic output (default: 42)")
+    process_parser.add_argument(
+        "--seed", type=int, help="Global RNG seed for deterministic output (default: 42)"
+    )
 
     # QUEUE subcommands (status, retry, clear)
     queue_parser = subparsers.add_parser("queue", help="Manage job queue")

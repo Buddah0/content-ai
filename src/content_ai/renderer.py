@@ -47,42 +47,54 @@ def render_segment_to_file(
             # Balanced settings for speed/quality
             codec = "libvpx-vp9"
             audio_codec = "libopus"
-            preset = None  # speed handled via ffmpeg_params in MoviePy if needed, but write_videofile has preset
-            # MoviePy doesn't map 'preset' directly to -speed for vp9 easily without ffmpeg_params.
-            # But let's stick to simple arguments supported by write_videofile where possible.
-            # For VP9, 'preset' arg in MoviePy might be ignored or passed as -preset (which VP9 doesn't use standardly like x264).
-            # We'll use ffmpeg_params for VP9 specifics.
+            preset = None  # speed handled via ffmpeg_params
+
             ffmpeg_params = [
-                "-b:v", "0",
-                "-crf", "32",
-                "-quality", "good",
-                "-speed", "2",
-                "-row-mt", "1",
-                "-tile-columns", "2",
-                "-frame-parallel", "1",
-                "-auto-alt-ref", "1",
-                "-lag-in-frames", "25",
-                "-pix_fmt", "yuv420p"
+                "-b:v",
+                "0",
+                "-crf",
+                "32",
+                "-quality",
+                "good",
+                "-speed",
+                "2",
+                "-row-mt",
+                "1",  # row based multithreading
+                "-tile-columns",
+                "2",
+                "-frame-parallel",
+                "1",
+                "-auto-alt-ref",
+                "1",
+                "-lag-in-frames",
+                "25",
+                "-pix_fmt",
+                "yuv420p",
             ]
             # Audio bitrate 96k
             audio_bitrate = "96k"
-            # write_videofile doesn't have audio_bitrate arg, passed via audio_bitrate string in some versions or ffmpeg_params?
-            # MoviePy write_videofile has 'audio_bitrate'.
+            # Opus prefers 48kHz sample rate
+            audio_fps = 48000
+            # Use .ogg for temporary audio (Opus in OGG container is standard)
+            temp_audio_ext = ".ogg"
         else:
             # MP4 Contract: H.264 + AAC (Default)
             codec = "libx264"
             audio_codec = "aac"
             ffmpeg_params = None
             preset = "ultrafast"
-            audio_bitrate = None # Use default
+            audio_bitrate = None  # Use default
+            audio_fps = 44100  # Standard for AAC/MP4 compatibility (or preserve source)
+            temp_audio_ext = ".m4a"
 
         # Write file
         kwargs = {
             "codec": codec,
             "audio_codec": audio_codec,
-            "temp_audiofile": f"temp_render_audio_{os.getpid()}.m4a",
+            "temp_audiofile": f"temp_render_audio_{os.getpid()}{temp_audio_ext}",
             "remove_temp": True,
             "logger": None,
+            "audio_fps": audio_fps,
         }
         if preset:
             kwargs["preset"] = preset
@@ -197,17 +209,17 @@ def verify_output_integrity(file_path: str, expected_format: str = "mp4") -> dic
     # Validate Format
     if expected_format == "webm":
         if "webm" not in meta.codec_name and "vp9" not in meta.codec_name:
-             # probe_video returns container info?
-             # probe_video returns VideoMetadata which has codec_name.
-             # Wait, probe_video checks video stream codec.
-             pass
+            # probe_video returns container info?
+            # probe_video returns VideoMetadata which has codec_name.
+            # Wait, probe_video checks video stream codec.
+            pass
 
     # We want to return detailed metrics
     return {
         "output.format": expected_format,
         "output.size_bytes": size,
         "output.sha256": checksum,
-        "output.container": expected_format, # Approximated
+        "output.container": expected_format,  # Approximated
         "output.video.codec": meta.codec_name,
         "output.audio.codec": meta.audio_codec,
         "output.duration": meta.duration,
@@ -472,6 +484,10 @@ def probe_video(video_path: str, frame_rate_tolerance: float = 0.01) -> VideoMet
     # Use ffprobe (same directory as ffmpeg)
     ffmpeg_exe = get_ffmpeg_cmd()
     ffprobe_exe = ffmpeg_exe.replace("ffmpeg", "ffprobe")
+
+    # Fallback to system ffprobe if specific path doesn't exist
+    if not os.path.exists(ffprobe_exe):
+        ffprobe_exe = "ffprobe"
 
     cmd = [
         ffprobe_exe,

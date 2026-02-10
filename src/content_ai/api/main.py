@@ -55,6 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --- CONFIG ENDPOINT ---
 @app.get("/config/defaults")
 async def get_config_defaults():
@@ -106,6 +107,7 @@ class PresetResponse(BaseModel):
 async def get_config_schema():
     """Return JSON Schema for the config model."""
     from content_ai.models import ContentAIConfig
+
     return ContentAIConfig.model_json_schema()
 
 
@@ -213,6 +215,7 @@ async def health_check():
 
 # --- PRESET ENDPOINTS ---
 
+
 def _preset_to_response(preset) -> dict:
     """Convert DB preset row to response dict."""
     return {
@@ -221,8 +224,12 @@ def _preset_to_response(preset) -> dict:
         "description": preset.description,
         "overrides": json.loads(preset.overrides) if preset.overrides else {},
         "schema_version": preset.schema_version,
-        "createdAt": preset.createdAt.replace(tzinfo=timezone.utc).isoformat() if preset.createdAt else None,
-        "updatedAt": preset.updatedAt.replace(tzinfo=timezone.utc).isoformat() if preset.updatedAt else None,
+        "createdAt": preset.createdAt.replace(tzinfo=timezone.utc).isoformat()
+        if preset.createdAt
+        else None,
+        "updatedAt": preset.updatedAt.replace(tzinfo=timezone.utc).isoformat()
+        if preset.updatedAt
+        else None,
     }
 
 
@@ -468,6 +475,7 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
 
     # 4. Validate merged config
     from content_ai.models import ContentAIConfig
+
     try:
         validated = ContentAIConfig.from_dict(merged)
         # Start from merged dict to preserve extra top-level keys (e.g. showCaptions,
@@ -484,10 +492,12 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         "schema_version": CURRENT_SCHEMA_VERSION,
     }
 
-    settings_json = json.dumps({
-        "resolved_config": resolved_config,
-        "config_source": config_source,
-    })
+    settings_json = json.dumps(
+        {
+            "resolved_config": resolved_config,
+            "config_source": config_source,
+        }
+    )
 
     query = insert(Job).values(
         id=job_id,

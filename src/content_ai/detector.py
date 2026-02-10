@@ -52,7 +52,9 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
             # Use max of adaptive or absolute floor (rms_thresh)
             final_thresh = max(adaptive_thresh, rms_thresh)
             print(f"Adaptive Stats :: Mean: {mean_rms:.4f}, Std: {std_rms:.4f}, K: {sensitivity}")
-            print(f"Threshold :: Adaptive: {adaptive_thresh:.4f} vs Floor: {rms_thresh} -> Final: {final_thresh:.4f}")
+            print(
+                f"Threshold :: Adaptive: {adaptive_thresh:.4f} vs Floor: {rms_thresh} -> Final: {final_thresh:.4f}"
+            )
         else:
             final_thresh = rms_thresh
 

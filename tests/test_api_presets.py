@@ -9,7 +9,11 @@ async def test_create_preset_success(client: AsyncClient):
     """Creating a preset with unique name should succeed."""
     response = await client.post(
         "/presets",
-        json={"name": "Test Preset", "description": "A test preset", "overrides": {"detection": {"rms_threshold": 0.2}}}
+        json={
+            "name": "Test Preset",
+            "description": "A test preset",
+            "overrides": {"detection": {"rms_threshold": 0.2}},
+        },
     )
     assert response.status_code == 201
     data = response.json()
@@ -35,7 +39,7 @@ async def test_create_preset_duplicate_returns_409(client: AsyncClient):
 async def test_rename_preset_to_existing_returns_409(client: AsyncClient):
     """Renaming a preset to an existing name should return 409 Conflict."""
     # Create two presets
-    res1 = await client.post("/presets", json={"name": "Preset A", "overrides": {}})
+    await client.post("/presets", json={"name": "Preset A", "overrides": {}})
     res2 = await client.post("/presets", json={"name": "Preset B", "overrides": {}})
     preset_b_id = res2.json()["id"]
 
@@ -54,8 +58,7 @@ async def test_import_preset_duplicate_returns_409(client: AsyncClient):
 
     # Try to import with same name
     response = await client.post(
-        "/presets/import",
-        json={"name": "Import Test", "overrides": {}, "schema_version": 1}
+        "/presets/import", json={"name": "Import Test", "overrides": {}, "schema_version": 1}
     )
     assert response.status_code == 409
     data = response.json()

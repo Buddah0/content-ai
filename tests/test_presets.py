@@ -79,6 +79,7 @@ class TestMigrateOverrides:
     def test_no_migration_needed(self):
         """Current version should return overrides unchanged."""
         from content_ai.presets import CURRENT_SCHEMA_VERSION
+
         overrides = {"a": 1}
         result = migrate_overrides(overrides, CURRENT_SCHEMA_VERSION)
         assert result == overrides
@@ -86,5 +87,6 @@ class TestMigrateOverrides:
     def test_future_version_raises(self):
         """Future schema version should raise error."""
         from content_ai.presets import CURRENT_SCHEMA_VERSION
+
         with pytest.raises(ValueError, match="newer than"):
             migrate_overrides({}, CURRENT_SCHEMA_VERSION + 1)

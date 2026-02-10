@@ -78,7 +78,7 @@ def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_
         # Overlay
         filters.append(f"{video_map}[wm]overlay=32:32[v_wm]")
         video_map = "[v_wm]"
-        inputs += 1 # We consumed an input
+        inputs += 1  # We consumed an input
 
     if show_captions and captions_path and os.path.exists(captions_path):
         filters.append(f"{video_map}subtitles='{captions_path}'[v_out]")
@@ -217,10 +217,10 @@ def run_mission_control_pipeline(
     else:
         # Ensure we don't accidentally use stale captions if we didn't generate them
         if os.path.exists(ass_path):
-             try:
-                 os.remove(ass_path)
-             except OSError:
-                 pass
+            try:
+                os.remove(ass_path)
+            except OSError:
+                pass
 
     # 3. Outputs
     out_16_9 = os.path.join(output_dir, "output_16_9.mp4")

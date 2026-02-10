@@ -46,17 +46,30 @@ def generate_demo_video(output_path: str, duration: float = 30.0, seed: int = 42
 
     def make_audio(t):
         """Generate audio with percussive spikes at event_times."""
+        # Handle potential scalar input by converting to array
+        t_array = np.asanyarray(t)
+
         # Base noise (very quiet)
-        signal = rng.normal(0, 0.01, len(t))
+        # Use simple normal distribution without seeding inside the loop for speed
+        # We use the global rng if seeded
+        # Note: if t is scalar, len() fails, so use t_array.shape
+        if t_array.ndim == 0:
+            t_array = t_array[None]  # Make 1D
+
+        signal = rng.normal(0, 0.01, t_array.shape)
 
         # Add percussive spikes
         for event_time in event_times:
             # Find samples near this event
-            event_samples = np.abs(t - event_time) < 0.1  # 100ms spike
-            # High amplitude spike
-            signal[event_samples] = rng.normal(0, 0.3, np.sum(event_samples))
+            # Use strict inequality on float array
+            event_mask = np.abs(t_array - event_time) < 0.1
+            if np.any(event_mask):
+                # Add spikes
+                signal[event_mask] += rng.normal(0, 0.3, np.sum(event_mask))
 
-        # Ensure mono output
+        # Return same shape as input (AudioClip expects this)
+        # If input was scalar, return scalar (though MoviePy usually asks for arrays)
+        # Actually MoviePy expects (N_samples, n_channels) or (N_samples,)
         return signal
 
     # Create video clip (simple colored background)

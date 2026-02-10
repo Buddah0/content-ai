@@ -21,10 +21,14 @@ class DetectionConfig(BaseModel):
         default=True, description="Use adaptive thresholding (Mean + k*Std) instead of fixed"
     )
     sensitivity: float = Field(
-        default=2.5, ge=0.0, description="Adaptive sensitivity (k in Mean + k*Std). Higher = fewer events."
+        default=2.5,
+        ge=0.0,
+        description="Adaptive sensitivity (k in Mean + k*Std). Higher = fewer events.",
     )
     event_lookback_s: float = Field(
-        default=5.0, ge=0.0, description="Seconds to look back from the start of an event (captures build-up)"
+        default=5.0,
+        ge=0.0,
+        description="Seconds to look back from the start of an event (captures build-up)",
     )
 
 

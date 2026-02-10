@@ -9,14 +9,16 @@ class BlueprintGenerator:
     def __init__(self):
         pass
 
-    def create_blueprint(self, project_name: str, raw_segments: List[Dict[str, Any]]) -> UniversalSchema:
+    def create_blueprint(
+        self, project_name: str, raw_segments: List[Dict[str, Any]]
+    ) -> UniversalSchema:
         """
         Creates a blueprint from a list of raw segments (e.g. from detector).
-        
+
         Args:
             project_name: Name of the project.
             raw_segments: List of dicts, expected to have 'start', 'end', and optional metadata.
-        
+
         Returns:
             A UniversalSchema object.
         """
@@ -45,10 +47,7 @@ class BlueprintGenerator:
         # Build schema
         schema = UniversalSchema(
             project_name=project_name,
-            timeline=Timeline(
-                duration_s=total_duration,
-                tracks=[video_track]
-            )
+            timeline=Timeline(duration_s=total_duration, tracks=[video_track]),
         )
 
         return schema

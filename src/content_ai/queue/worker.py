@@ -293,7 +293,9 @@ def process_video_job(
                     rendering_config.contract.container = "webm"
                     rendering_config.contract.video_codec.codec = "libvpx-vp9"
                     rendering_config.contract.video_codec.crf = 32
-                    rendering_config.contract.video_codec.preset = "medium" # speed handled elsewhere? runner uses it.
+                    rendering_config.contract.video_codec.preset = (
+                        "medium"  # speed handled elsewhere? runner uses it.
+                    )
                     # VP9 speed settings are complex in runner, mapped from preset?
                     # Runner uses: -c:v codec, -preset preset.
                     # libvpx-vp9 supports -speed via -cpu-used ... wait, ffmpeg standard is -cpu-used or -speed depending on version?
