@@ -30,7 +30,7 @@ class Job(Base):
     id = Column(String, primary_key=True)
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     progress = Column(Integer, default=0)
-    createdAt = Column(DateTime, default=datetime.utcnow)
+    createdAt = Column(DateTime, default=datetime.utcnow)  # noqa: N815
     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # noqa: N815
     assetId = Column(String, ForeignKey("Asset.id"))  # noqa: N815
     settings = Column(String, nullable=True)  # JSON string of settings used
@@ -56,6 +56,7 @@ class Output(Base):
 
 class ConfigPreset(Base):
     """Global configuration preset storing overrides only."""
+
     __tablename__ = "ConfigPreset"
     id = Column(String, primary_key=True)
     name = Column(String, unique=True, nullable=False, index=True)
@@ -64,4 +65,3 @@ class ConfigPreset(Base):
     schema_version = Column(Integer, nullable=False, default=1)
     createdAt = Column(DateTime, default=datetime.utcnow)  # noqa: N815
     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # noqa: N815
-

@@ -50,10 +50,12 @@ def run_scan(cli_args: Dict[str, Any]):
 
     # 2. Output Setup
     output_base = cli_args.get("output", "output")
+    output_fmt = conf["output"].get("output_format", "mp4")
+    ext = f".{output_fmt}"
 
-    # For demo mode, output directly to demo_output.mp4
+    # For demo mode, output directly to demo_output.<ext>
     if is_demo:
-        demo_output_path = Path("demo_output.mp4")
+        demo_output_path = Path(f"demo_output{ext}")
         print(f"Demo output will be saved to: {demo_output_path.absolute()}")
     else:
         demo_output_path = None
@@ -216,7 +218,7 @@ def run_scan(cli_args: Dict[str, Any]):
                     seg["start"],
                     seg["end"],
                     str(out_name),
-                    output_format=output_fmt
+                    output_format=output_fmt,
                 )
                 dt = time.perf_counter() - t0
                 per_clip_timings.append(dt)
@@ -230,7 +232,9 @@ def run_scan(cli_args: Dict[str, Any]):
 
                 # Verify integrity
                 print("Verifying output integrity...")
-                integrity = renderer.verify_output_integrity(str(montage_path), expected_format=output_fmt)
+                integrity = renderer.verify_output_integrity(
+                    str(montage_path), expected_format=output_fmt
+                )
                 render_metrics.update(integrity)
 
             except Exception as e:
@@ -242,11 +246,9 @@ def run_scan(cli_args: Dict[str, Any]):
             render_metrics["timings"] = {
                 "per_clip_seconds": per_clip_timings,
                 "total_encode_seconds": total_encode_time,
-                "concat_seconds": time.perf_counter() - t0_concat
+                "concat_seconds": time.perf_counter() - t0_concat,
             }
-            render_metrics["render_settings"] = {
-                 "format": output_fmt
-            }
+            render_metrics["render_settings"] = {"format": output_fmt}
 
         finally:
             if not conf["output"]["keep_temp"]:
@@ -278,7 +280,7 @@ def run_scan(cli_args: Dict[str, Any]):
         "found_segments_total": len(all_segments),
         "selected_segments": len(final_segments),
         "overrides": cli_args,  # Just dumping CLI args as overrides for now + any others
-        "output": render_metrics # Add detailed metrics
+        "output": render_metrics,  # Add detailed metrics
     }
     with open(run_dir / "run_meta.json", "w") as f:
         json.dump(meta, f, indent=2)

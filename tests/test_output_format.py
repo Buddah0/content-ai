@@ -9,24 +9,21 @@ from content_ai.renderer import render_segment_to_file, verify_output_integrity
 # Mock config
 @pytest.fixture
 def mock_config():
-    return {
-        "output": {
-            "output_format": "webm",
-            "keep_temp": False
-        },
-        "rendering": {}
-    }
+    return {"output": {"output_format": "webm", "keep_temp": False}, "rendering": {}}
+
 
 def test_config_output_format_default():
     """Test default output format is mp4."""
     config = ContentAIConfig()
     assert config.output.output_format == "mp4"
 
+
 def test_config_output_format_webm():
     """Test setting output format to webm."""
     config_data = {"output": {"output_format": "webm"}}
     config = ContentAIConfig.from_dict(config_data)
     assert config.output.output_format == "webm"
+
 
 def test_renderer_webm_contract_legacy(tmp_path):
     """Test render_segment_to_file passes correct arguments for WebM."""
@@ -55,6 +52,7 @@ def test_renderer_webm_contract_legacy(tmp_path):
         assert "-speed" in call_kwargs["ffmpeg_params"]
         assert call_kwargs.get("audio_bitrate") == "96k"
 
+
 def test_renderer_mp4_contract_legacy(tmp_path):
     """Test render_segment_to_file passes correct arguments for MP4."""
     source = tmp_path / "source.mp4"
@@ -77,6 +75,7 @@ def test_renderer_mp4_contract_legacy(tmp_path):
         assert call_kwargs["audio_codec"] == "aac"
         assert call_kwargs["preset"] == "ultrafast"
 
+
 def test_verify_output_integrity_success(tmp_path):
     """Test integrity check passes for valid file."""
     fake_file = tmp_path / "valid.webm"
@@ -96,6 +95,7 @@ def test_verify_output_integrity_success(tmp_path):
         assert metrics["output.size_bytes"] > 0
         assert "output.sha256" in metrics
 
+
 def test_verify_output_integrity_empty(tmp_path):
     """Test integrity check fails for empty file."""
     empty_file = tmp_path / "empty.webm"
@@ -103,6 +103,7 @@ def test_verify_output_integrity_empty(tmp_path):
 
     with pytest.raises(ValueError, match="is empty"):
         verify_output_integrity(str(empty_file))
+
 
 def test_verify_output_integrity_missing(tmp_path):
     """Test integrity check fails for missing file."""

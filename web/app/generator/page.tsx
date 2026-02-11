@@ -16,6 +16,7 @@ import { PresetBar } from '@/components/preset-bar';
 import { SavePresetDialog } from '@/components/save-preset-dialog';
 import { ManagePresetsDrawer, downloadPresetJson } from '@/components/manage-presets-drawer';
 import { type GeneratorSettings, type PresetSettings, extractPresetValues, settingsToBackendFormat } from '@/lib/preset-keys';
+import { VideoPlayer } from '@/components/video-player';
 
 const API_BASE = "http://localhost:8000";
 
@@ -366,7 +367,7 @@ export default function GeneratorPage() {
                                         <CardTitle className="text-neon-cyan">{out.type} Output</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
-                                        <video
+                                        <VideoPlayer
                                             src={`${API_BASE}/${out.path}`}
                                             controls
                                             className="w-full rounded-lg border border-glass-border bg-black aspect-video"

@@ -66,9 +66,7 @@ class TestPipelineDeterminism:
         source_path = "/test/video.mp4"
         for s in merged:
             s["source_path"] = source_path
-            s["id"] = deterministic_segment_id(
-                source_path, s["start"], s["end"], s.get("score", 0)
-            )
+            s["id"] = deterministic_segment_id(source_path, s["start"], s["end"], s.get("score", 0))
         return merged
 
     def test_identical_runs_produce_identical_output(self):

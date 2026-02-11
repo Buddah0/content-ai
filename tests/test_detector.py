@@ -1,4 +1,3 @@
-
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -12,6 +11,7 @@ def mock_librosa():
     with patch("content_ai.detector.librosa") as mock:
         yield mock
 
+
 @pytest.fixture
 def mock_video_clip():
     with patch("content_ai.detector.VideoFileClip") as mock:
@@ -19,6 +19,7 @@ def mock_video_clip():
         mock_instance.audio = MagicMock()
         mock_instance.duration = 10.0
         yield mock_instance
+
 
 def test_adaptive_threshold(mock_librosa, mock_video_clip):
     # Setup mock audio data
@@ -32,18 +33,12 @@ def test_adaptive_threshold(mock_librosa, mock_video_clip):
 
     # Mock RMS: mostly 0.05, one peak at 0.5
     rms_vals = np.ones(100) * 0.05
-    rms_vals[50] = 0.5 # The peak
+    rms_vals[50] = 0.5  # The peak
 
     mock_librosa.feature.rms.return_value = np.array([rms_vals])
     mock_librosa.times_like.return_value = np.linspace(0, 10, 100)
 
-    config = {
-        "detection": {
-            "adaptive_threshold": True,
-            "sensitivity": 2.0,
-            "rms_threshold": 0.1
-        }
-    }
+    config = {"detection": {"adaptive_threshold": True, "sensitivity": 2.0, "rms_threshold": 0.1}}
 
     # Mean ~0.0545, Std ~0.045
     # Thresh = 0.0545 + 2*0.045 = ~0.1445
@@ -61,10 +56,11 @@ def test_adaptive_threshold(mock_librosa, mock_video_clip):
     segments_strict = detector.detect_hype("dummy.mp4", config)
     assert len(segments_strict) == 0
 
+
 def test_event_lookback(mock_librosa, mock_video_clip):
     # Setup mock audio
     y = np.zeros(100)
-    sr = 1 # 1 sample per second for easy math
+    sr = 1  # 1 sample per second for easy math
     mock_librosa.load.return_value = (y, sr)
     mock_librosa.effects.hpss.return_value = (y, y)
 
@@ -77,11 +73,7 @@ def test_event_lookback(mock_librosa, mock_video_clip):
     detector.librosa.times_like.return_value = np.arange(20, dtype=float)
 
     config = {
-        "detection": {
-            "adaptive_threshold": False,
-            "rms_threshold": 0.1,
-            "event_lookback_s": 3.0
-        }
+        "detection": {"adaptive_threshold": False, "rms_threshold": 0.1, "event_lookback_s": 3.0}
     }
 
     segments = detector.detect_hype("dummy.mp4", config)
@@ -90,8 +82,7 @@ def test_event_lookback(mock_librosa, mock_video_clip):
     assert segments[0]["start"] == 7.0
     # Event is at t=10. Lookback is 3. Start should be 7.
     assert segments[0]["start"] == 7.0
-    assert segments[0]["end"] == 11.0 # Ends at t=11 (first non-hype sample)
-
+    assert segments[0]["end"] == 11.0  # Ends at t=11 (first non-hype sample)
 
     # Setup mock audio
     y = np.zeros(100)
@@ -104,12 +95,7 @@ def test_event_lookback(mock_librosa, mock_video_clip):
     mock_librosa.feature.rms.return_value = np.array([rms_vals])
     mock_librosa.times_like.return_value = np.linspace(0, 10, 100)
 
-    config = {
-        "detection": {
-            "adaptive_threshold": False,
-            "rms_threshold": 0.1
-        }
-    }
+    config = {"detection": {"adaptive_threshold": False, "rms_threshold": 0.1}}
 
     # Should find nothing as 0.05 < 0.1
     segments = detector.detect_hype("dummy.mp4", config)
@@ -119,4 +105,3 @@ def test_event_lookback(mock_librosa, mock_video_clip):
     config["detection"]["rms_threshold"] = 0.01
     segments = detector.detect_hype("dummy.mp4", config)
     assert len(segments) > 0
-

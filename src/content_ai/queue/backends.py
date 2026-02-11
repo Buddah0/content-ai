@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Abstract base classes for queue backends and manifest storage.
 
 This module defines the interfaces for queue operations, manifest storage,
@@ -7,6 +5,8 @@ and worker pool management. These abstractions enable local-first implementation
 (SQLite + ProcessPoolExecutor) while remaining distributed-ready for future
 migration to Redis/Celery/Taskiq.
 """
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
@@ -194,10 +194,7 @@ class ManifestStore(ABC):
 
     @abstractmethod
     def verify_hashes(
-        self,
-        video_path: str,
-        config_hash: str,
-        input_hashes: Dict[str, Any]
+        self, video_path: str, config_hash: str, input_hashes: Dict[str, Any]
     ) -> Tuple[bool, str]:
         """Check if item is dirty (config or input changed).
 

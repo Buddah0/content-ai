@@ -18,16 +18,16 @@ CURRENT_SCHEMA_VERSION = 1
 def compute_overrides(defaults: Dict[str, Any], current: Dict[str, Any]) -> Dict[str, Any]:
     """
     Compute minimal overrides (diff) between defaults and current config.
-    
+
     Uses JSON Merge Patch semantics (RFC 7396):
     - Only values that differ from defaults are included
     - Nested dicts are recursively diffed
     - Null values mean "delete this key" (but we don't use deletion here)
-    
+
     Args:
         defaults: The default configuration dict
         current: The current (modified) configuration dict
-        
+
     Returns:
         Dict containing only the keys/values that differ from defaults
     """
@@ -51,15 +51,16 @@ def compute_overrides(defaults: Dict[str, Any], current: Dict[str, Any]) -> Dict
 def apply_overrides(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
     """
     Apply overrides to defaults using JSON Merge Patch semantics (RFC 7396).
-    
+
     Args:
         defaults: The default configuration dict
         overrides: The overrides to apply
-        
+
     Returns:
         Merged configuration dict
     """
     import copy
+
     result = copy.deepcopy(defaults)
 
     for key, override_value in overrides.items():
@@ -79,13 +80,13 @@ def apply_overrides(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict
 def validate_config(config_dict: Dict[str, Any]) -> ContentAIConfig:
     """
     Validate a config dict against the Pydantic model.
-    
+
     Args:
         config_dict: The configuration dict to validate
-        
+
     Returns:
         Validated ContentAIConfig instance
-        
+
     Raises:
         ValidationError: If the config is invalid
     """
@@ -99,12 +100,12 @@ def resolve_with_preset(
 ) -> ContentAIConfig:
     """
     Resolve final config by layering: defaults -> preset -> request overrides.
-    
+
     Args:
         defaults: Base default configuration
         preset_overrides: Overrides from a saved preset (optional)
         request_overrides: Overrides from the current request (optional)
-        
+
     Returns:
         Validated ContentAIConfig instance
     """
@@ -122,14 +123,14 @@ def resolve_with_preset(
 def migrate_overrides(overrides: Dict[str, Any], from_version: int) -> Dict[str, Any]:
     """
     Migrate overrides from an older schema version to current.
-    
+
     Args:
         overrides: The overrides dict to migrate
         from_version: The schema version the overrides were created with
-        
+
     Returns:
         Migrated overrides dict compatible with CURRENT_SCHEMA_VERSION
-        
+
     Raises:
         ValueError: If from_version is newer than CURRENT_SCHEMA_VERSION
     """

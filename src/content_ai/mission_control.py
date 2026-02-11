@@ -1,10 +1,11 @@
 import os
+import shlex
 import subprocess
 from typing import Any, Dict, List
 
 # Reuse existing modules
 from content_ai.detector import detect_hype
-from content_ai.renderer import build_montage_from_list, get_ffmpeg_cmd, render_segment_to_file
+from content_ai.renderer import build_montage_from_list, get_ffmpeg_cmd, render_segment_to_file, has_audio
 from content_ai.segments import merge_segments, pad_segments
 
 WATERMARK_PATH = os.path.join(os.getcwd(), "watermark.png")
@@ -58,6 +59,49 @@ def format_timestamp(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
+def run_render_with_audio_check(cmd: List[str], source_path: str, output_path: str):
+    """
+    Run ffmpeg command and verify audio preservation.
+    If audio is lost (and source had audio), retry with different audio codec.
+    """
+    print(f"Running render: {shlex.join(cmd)}")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"FFmpeg failed with exit code {e.returncode}")
+        raise
+
+    # Robustness check: did we lose audio?
+    if has_audio(source_path) and not has_audio(output_path):
+        print(f"WARNING: Audio lost in {output_path}. Retrying with AAC transcoding.")
+        
+        # Replace -c:a copy with -c:a aac -b:a 192k
+        new_cmd = []
+        skip = False
+        for i, arg in enumerate(cmd):
+            if skip:
+                skip = False
+                continue
+            
+            if arg == "-c:a" and i + 1 < len(cmd) and cmd[i + 1] == "copy":
+                new_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+                skip = True
+            else:
+                new_cmd.append(arg)
+                
+        print(f"Retry render (AAC): {shlex.join(new_cmd)}")
+        try:
+            subprocess.run(new_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Retry FFmpeg failed with exit code {e.returncode}")
+            raise
+
+        if not has_audio(output_path):
+            raise RuntimeError(
+                f"Failed to preserve audio in {output_path} after retry.\n"
+                f"Command: {shlex.join(new_cmd)}"
+            )
+
 def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_path: str = None):
     """
     Apply Watermark + Captions to 16:9 source.
@@ -78,7 +122,7 @@ def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_
         # Overlay
         filters.append(f"{video_map}[wm]overlay=32:32[v_wm]")
         video_map = "[v_wm]"
-        inputs += 1 # We consumed an input
+        inputs += 1  # We consumed an input
 
     if show_captions and captions_path and os.path.exists(captions_path):
         filters.append(f"{video_map}subtitles='{captions_path}'[v_out]")
@@ -88,14 +132,21 @@ def render_16_9(source_path: str, output_path: str, user_config: Dict, captions_
         cmd.extend(["-i", WATERMARK_PATH])
 
     if filters:
-        cmd.extend(["-filter_complex", ";".join(filters), "-map", video_map])
+        # User requested audio mapping: -map 0:a?
+        cmd.extend(["-filter_complex", ";".join(filters), "-map", video_map, "-map", "0:a?"])
     else:
-        cmd.extend(["-map", "0:v"])
+        cmd.extend(["-map", "0:v", "-map", "0:a?"])
 
-    cmd.extend(["-c:v", "libx264", "-c:a", "copy", output_path])
+    cmd.extend([
+        "-c:v", "libx264",
+        "-c:a", "copy",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-shortest",
+        output_path
+    ])
 
-    print(f"Rendering 16:9: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    run_render_with_audio_check(cmd, source_path, output_path)
 
 
 def render_9_16(source_path: str, output_path: str, user_config: Dict, captions_path: str = None):
@@ -147,16 +198,22 @@ def render_9_16(source_path: str, output_path: str, user_config: Dict, captions_
             filter_complex,
             "-map",
             current_stream,
+            "-map",
+            "0:a?",
             "-c:v",
             "libx264",
             "-c:a",
             "copy",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-shortest",
             output_path,
         ]
     )
 
-    print(f"Rendering 9:16: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    run_render_with_audio_check(cmd, source_path, output_path)
 
 
 def run_mission_control_pipeline(
@@ -217,10 +274,10 @@ def run_mission_control_pipeline(
     else:
         # Ensure we don't accidentally use stale captions if we didn't generate them
         if os.path.exists(ass_path):
-             try:
-                 os.remove(ass_path)
-             except OSError:
-                 pass
+            try:
+                os.remove(ass_path)
+            except OSError:
+                pass
 
     # 3. Outputs
     out_16_9 = os.path.join(output_dir, "output_16_9.mp4")

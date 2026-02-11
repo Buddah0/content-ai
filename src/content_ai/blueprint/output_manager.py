@@ -11,13 +11,17 @@ class OutputStrategy(ABC):
         """Export the schema to a string representation."""
         pass
 
+
 class JSONStrategy(OutputStrategy):
     """Exports as raw Universal Schema JSON."""
+
     def export(self, schema: UniversalSchema) -> str:
         return schema.model_dump_json(indent=2)
 
+
 class MarkdownStrategy(OutputStrategy):
     """Exports as a human-readable Markdown summary."""
+
     def export(self, schema: UniversalSchema) -> str:
         md = f"# Project: {schema.project_name}\n\n"
         md += f"**Duration:** {schema.timeline.duration_s}s | **FPS:** {schema.timeline.fps}\n\n"
@@ -31,8 +35,10 @@ class MarkdownStrategy(OutputStrategy):
             md += "\n"
         return md
 
+
 class PlainTextStrategy(OutputStrategy):
     """Exports as a simplified output for screen readers."""
+
     def export(self, schema: UniversalSchema) -> str:
         text = f"Project {schema.project_name}, {schema.timeline.duration_s} seconds.\n"
         for track in schema.timeline.tracks:
@@ -41,6 +47,7 @@ class PlainTextStrategy(OutputStrategy):
                 desc = seg.visual_description or seg.audio_intent or "Content"
                 text += f"From {seg.start:.1f} to {seg.end:.1f}: {desc}.\n"
         return text
+
 
 class OutputManager:
     """Manages output generation using strategies."""
