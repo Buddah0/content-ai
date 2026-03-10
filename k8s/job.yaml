@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: content-ai-worker
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      name: content-ai-worker
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: buddah0/content-ai-worker:latest
+          command: ["python", "-m", "content_ai.api_worker"]
+          env:
+            - name: DATABASE_URL
+              value: sqlite:////data/content_ai.db
+            - name: WORKER_POLL_INTERVAL_S
+              value: "1.0"
+            - name: PYTHONPATH
+              value: /app/src
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: outputs
+              mountPath: /app/outputs
+            - name: db
+              mountPath: /data
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: content-ai-uploads-pvc
+        - name: outputs
+          persistentVolumeClaim:
+            claimName: content-ai-outputs-pvc
+        - name: db
+          persistentVolumeClaim:
+            claimName: content-ai-db-pvc

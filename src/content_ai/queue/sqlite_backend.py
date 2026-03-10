@@ -11,7 +11,7 @@ This module provides the local-first, crash-safe queue implementation using:
 import json
 import sqlite3
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,6 +26,10 @@ except ImportError:
 from .backends import ManifestStore, QueueBackend
 from .hashing import compute_output_hash
 from .models import JobItem, JobResult, JobStatus
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 # SQLite schema SQL
 SCHEMA_SQL = """
@@ -246,7 +250,7 @@ class SQLiteManifest(ManifestStore):
                 SET status = ?, updated_at = ?
                 WHERE video_path = ?
             """,
-                (JobStatus.DIRTY.value, datetime.now().isoformat(), str(video_path)),
+                (JobStatus.DIRTY.value, _utc_now().isoformat(), str(video_path)),
             )
 
     def get_all_items(self, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -392,7 +396,7 @@ class SQLiteQueue(QueueBackend):
                     self.db.conn.execute("BEGIN IMMEDIATE")
 
                     try:
-                        now = datetime.now().isoformat()
+                        now = _utc_now().isoformat()
 
                         cursor = self.db.conn.execute(
                             """
@@ -539,7 +543,7 @@ class SQLiteQueue(QueueBackend):
             """,
                 (
                     JobStatus.SUCCEEDED.value,
-                    datetime.now().isoformat(),
+                    _utc_now().isoformat(),
                     json.dumps(result.output_files),
                     json.dumps(output_hashes),
                     job_id,
@@ -606,7 +610,7 @@ class SQLiteQueue(QueueBackend):
                 """,
                     (
                         JobStatus.FAILED.value,
-                        datetime.now().isoformat(),
+                        _utc_now().isoformat(),
                         new_attempt,
                         error_snippet,
                         job_id,
@@ -666,8 +670,8 @@ class SQLiteQueue(QueueBackend):
         - Clears worker_id
         - Logs transition for audit
         """
-        cutoff_heartbeat = datetime.now() - timedelta(seconds=600)  # 10 minutes
-        cutoff_started = datetime.now() - timedelta(seconds=timeout_s)
+        cutoff_heartbeat = _utc_now() - timedelta(seconds=600)  # 10 minutes
+        cutoff_started = _utc_now() - timedelta(seconds=timeout_s)
 
         with self.db.conn:
             cursor = self.db.execute(
@@ -719,7 +723,7 @@ class SQLiteQueue(QueueBackend):
                 SET last_heartbeat = ?
                 WHERE job_id = ? AND status = ?
             """,
-                (datetime.now().isoformat(), job_id, JobStatus.RUNNING.value),
+                (_utc_now().isoformat(), job_id, JobStatus.RUNNING.value),
             )
 
     def get_all_items(self, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -755,7 +759,7 @@ class SQLiteQueue(QueueBackend):
                 "job_id": job_id,
                 "from_state": from_state,
                 "to_state": to_state,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _utc_now().isoformat(),
                 "worker_id": worker_id,
                 "error_snippet": error[:200] if error else None,
             }

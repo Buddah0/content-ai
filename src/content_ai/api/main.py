@@ -11,7 +11,7 @@ from sqlite3 import IntegrityError
 from typing import AsyncGenerator
 
 from databases import Database
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -136,7 +136,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.PROCESSING, progress=0, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.PROCESSING, progress=0, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
 
@@ -145,7 +145,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         os.makedirs(output_dir, exist_ok=True)
 
         await database.execute(
-            update(Job).where(Job.id == job_id).values(progress=10, updatedAt=datetime.utcnow())
+            update(Job).where(Job.id == job_id).values(progress=10, updatedAt=datetime.now(timezone.utc))
         )
 
         # Run in thread
@@ -154,7 +154,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         )
 
         await database.execute(
-            update(Job).where(Job.id == job_id).values(progress=90, updatedAt=datetime.utcnow())
+            update(Job).where(Job.id == job_id).values(progress=90, updatedAt=datetime.now(timezone.utc))
         )
 
         # Insert Segments
@@ -182,7 +182,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.COMPLETED, progress=100, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.COMPLETED, progress=100, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
         print(f"Job {job_id} completed")
@@ -195,7 +195,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.FAILED, progress=0, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.FAILED, progress=0, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
 
@@ -253,8 +253,8 @@ async def create_preset(data: PresetCreate):
             description=data.description,
             overrides=json.dumps(data.overrides),
             schema_version=CURRENT_SCHEMA_VERSION,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
+            updatedAt=datetime.now(timezone.utc),
         )
         await database.execute(query)
     except IntegrityError:
@@ -293,7 +293,7 @@ async def update_preset(preset_id: str, data: PresetUpdate):
         raise HTTPException(status_code=404, detail="Preset not found")
 
     # Build update values
-    update_values = {"updatedAt": datetime.utcnow()}
+    update_values = {"updatedAt": datetime.now(timezone.utc)}
     if data.name is not None:
         update_values["name"] = data.name
     if data.description is not None:
@@ -379,8 +379,8 @@ async def import_preset(data: dict):
             description=description,
             overrides=json.dumps(overrides),
             schema_version=CURRENT_SCHEMA_VERSION,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
+            updatedAt=datetime.now(timezone.utc),
         )
         await database.execute(query)
     except IntegrityError:
@@ -430,7 +430,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Create Asset in DB
     query = insert(Asset).values(
-        id=asset_id, filename=file.filename, path=file_path, createdAt=datetime.utcnow()
+        id=asset_id, filename=file.filename, path=file_path, createdAt=datetime.now(timezone.utc)
     )
     await database.execute(query)
 
@@ -438,7 +438,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @app.post("/jobs")
-async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
+async def create_job(job_data: JobCreate):
     job_id = str(uuid.uuid4())
 
     # Verify asset exists
@@ -505,13 +505,10 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         settings=settings_json,
         status=JobStatus.PENDING,
         progress=0,
-        createdAt=datetime.utcnow(),
-        updatedAt=datetime.utcnow(),
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
     )
     await database.execute(query)
-
-    # 6. Trigger Processing with resolved config
-    background_tasks.add_task(process_job_task, job_id, resolved_config)
 
     return {"id": job_id, "status": "PENDING"}
 

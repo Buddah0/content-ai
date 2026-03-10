@@ -4,11 +4,11 @@ This module defines the type-safe models used throughout the queue system.
 All models use Pydantic for validation and serialization.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JobStatus(str, Enum):
@@ -33,6 +33,10 @@ class JobStatus(str, Enum):
     SKIPPED = "skipped"  # Intentionally excluded (e.g., file too small)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class JobItem(BaseModel):
     """Immutable job specification for queue operations.
 
@@ -50,7 +54,7 @@ class JobItem(BaseModel):
     priority: int = Field(default=0, ge=0, description="Higher = processed first")
     attempt_count: int = Field(default=0, ge=0, description="Number of retry attempts")
     max_attempts: int = Field(default=3, ge=1, description="Max retry limit")
-    created_at: datetime = Field(default_factory=datetime.now, description="Queue time")
+    created_at: datetime = Field(default_factory=_utc_now, description="Queue time")
     started_at: Optional[datetime] = Field(default=None, description="Processing start time")
     completed_at: Optional[datetime] = Field(default=None, description="Completion time")
     last_heartbeat: Optional[datetime] = Field(
@@ -64,10 +68,7 @@ class JobItem(BaseModel):
     )
     metadata: Dict[str, Any] = Field(default_factory=dict, description="User-defined tags")
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True  # Serialize enums as strings
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class JobResult(BaseModel):
@@ -84,10 +85,7 @@ class JobResult(BaseModel):
     duration_s: float = Field(default=0.0, ge=0.0, description="Processing time in seconds")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class RunManifest(BaseModel):
@@ -99,8 +97,8 @@ class RunManifest(BaseModel):
 
     run_id: str = Field(..., description="Run identifier (e.g., run_001)")
     config_hash: str = Field(..., description="Config fingerprint for this run")
-    created_at: datetime = Field(default_factory=datetime.now, description="Run start time")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Last update time")
+    created_at: datetime = Field(default_factory=_utc_now, description="Run start time")
+    updated_at: datetime = Field(default_factory=_utc_now, description="Last update time")
     status: str = Field(
         default="in_progress", description="Run status: in_progress, completed, failed"
     )
@@ -108,12 +106,6 @@ class RunManifest(BaseModel):
     succeeded_items: int = Field(default=0, ge=0, description="Successfully completed jobs")
     failed_items: int = Field(default=0, ge=0, description="Failed jobs")
     pending_items: int = Field(default=0, ge=0, description="Not yet processed jobs")
-
-    class Config:
-        """Pydantic configuration."""
-
-        json_encoders = {datetime: lambda v: v.isoformat()}
-
 
 class StateTransition(BaseModel):
     """Audit log entry for job state changes.
@@ -125,11 +117,7 @@ class StateTransition(BaseModel):
     job_id: str = Field(..., description="Job identifier")
     from_state: Optional[str] = Field(default=None, description="Previous state")
     to_state: str = Field(..., description="New state")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Transition time")
+    timestamp: datetime = Field(default_factory=_utc_now, description="Transition time")
     worker_id: Optional[str] = Field(default=None, description="Worker that caused transition")
     error_snippet: Optional[str] = Field(default=None, description="First 200 chars of error")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_encoders = {datetime: lambda v: v.isoformat()}

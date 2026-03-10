@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-ai-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: content-ai-worker
+  template:
+    metadata:
+      labels:
+        app: content-ai-worker
+    spec:
+      containers:
+        - name: worker
+          image: buddah0/content-ai-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_URL
+              value: sqlite:////data/content_ai.db
+            - name: WORKER_POLL_INTERVAL_S
+              value: "1.0"
+            - name: PYTHONPATH
+              value: /app/src
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: outputs
+              mountPath: /app/outputs
+            - name: db
+              mountPath: /data
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: content-ai-uploads-pvc
+        - name: outputs
+          persistentVolumeClaim:
+            claimName: content-ai-outputs-pvc
+        - name: db
+          persistentVolumeClaim:
+            claimName: content-ai-db-pvc
