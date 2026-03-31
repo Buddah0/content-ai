@@ -48,7 +48,7 @@ npx prisma generate
 ## Running Mission Control
 
 > [!IMPORTANT]
-> You need **two separate terminal windows** running simultaneously for the full experience.
+> You need **three separate terminal windows** running simultaneously for the full experience.
 
 ### Terminal 1: Start Backend (FastAPI)
 Run this command from the root `content-ai` directory:
@@ -57,7 +57,14 @@ Run this command from the root `content-ai` directory:
 ./venv/bin/python -m uvicorn content_ai.api.main:app --app-dir src --reload --port 8000
 ```
 
-### Terminal 2: Start Frontend (Next.js)
+### Terminal 2: Start Worker (Job Processor)
+Run this command from the root `content-ai` directory:
+```bash
+# Polls pending jobs from DB and runs the video pipeline
+PYTHONPATH=src ./venv/bin/python -m content_ai.api_worker
+```
+
+### Terminal 3: Start Frontend (Next.js)
 Open a new terminal window and move into the `web` folder:
 ```bash
 # Navigate to web/ and start the UI

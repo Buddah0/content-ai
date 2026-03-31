@@ -24,7 +24,7 @@ Usage:
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,6 +40,10 @@ from .queue import (
     compute_input_hash,
     process_video_job,
 )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def enqueue_batch(
@@ -339,7 +343,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
     output_base = cli_args.get("output", "output")
 
     # Use timestamped batch directory
-    batch_name = datetime.now().strftime("batch_%Y%m%d_%H%M%S")
+    batch_name = _utc_now().strftime("batch_%Y%m%d_%H%M%S")
     batch_dir = Path(output_base) / batch_name
     batch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -416,7 +420,7 @@ def run_queued_scan(cli_args: Dict[str, Any]) -> None:
 
     batch_meta = {
         "batch_name": batch_name,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": _utc_now().isoformat(),
         "config": config_dict,
         "enqueue_stats": enqueue_stats,
         "process_stats": process_stats,

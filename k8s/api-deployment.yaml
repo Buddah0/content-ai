@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-ai-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: content-ai-api
+  template:
+    metadata:
+      labels:
+        app: content-ai-api
+    spec:
+      containers:
+        - name: api
+          image: buddah0/content-ai-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: sqlite:////data/content_ai.db
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: outputs
+              mountPath: /app/outputs
+            - name: db
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: content-ai-uploads-pvc
+        - name: outputs
+          persistentVolumeClaim:
+            claimName: content-ai-outputs-pvc
+        - name: db
+          persistentVolumeClaim:
+            claimName: content-ai-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-ai-api
+spec:
+  selector:
+    app: content-ai-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

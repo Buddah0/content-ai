@@ -11,14 +11,14 @@ from sqlite3 import IntegrityError
 from typing import AsyncGenerator
 
 from databases import Database
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import create_engine, delete, insert, select, update
 
-from content_ai.api.db_models import Asset, ConfigPreset, Job, JobStatus, Output, Segment
+from content_ai.api.db_models import Asset, Base, ConfigPreset, Job, JobStatus, Output, Segment
 from content_ai.config import resolve_config
 from content_ai.mission_control import run_mission_control_pipeline
 from content_ai.presets import (
@@ -29,6 +29,8 @@ from content_ai.presets import (
 
 # --- CONFIG ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./content_ai.db")
+JOB_TIMEOUT_S = int(os.getenv("JOB_TIMEOUT_S", "1800"))
+WORKER_POLL_INTERVAL_S = float(os.getenv("WORKER_POLL_INTERVAL_S", "1.0"))
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
 OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -37,11 +39,75 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 database = Database(DATABASE_URL)
 
 
+def _ensure_schema() -> None:
+    # Compose uses SQLite by default; auto-create tables on boot for first-run setup.
+    if DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(DATABASE_URL)
+        Base.metadata.create_all(engine)
+
+
+def _extract_resolved_settings(settings_json: str | None) -> dict | None:
+    if not settings_json:
+        return None
+    try:
+        payload = json.loads(settings_json)
+        if isinstance(payload, dict):
+            resolved = payload.get("resolved_config")
+            if isinstance(resolved, dict):
+                return resolved
+    except json.JSONDecodeError:
+        return None
+    return None
+
+
+async def _claim_next_pending_job_id() -> str | None:
+    query = select(Job).where(Job.status == JobStatus.PENDING).order_by(Job.createdAt.asc())
+    job = await database.fetch_one(query)
+    if not job:
+        return None
+    await database.execute(
+        update(Job)
+        .where(Job.id == job.id)
+        .values(status=JobStatus.QUEUED, updatedAt=datetime.now(timezone.utc))
+    )
+    return job.id
+
+
+async def _run_worker_loop() -> None:
+    """Background worker loop — runs inside the API process so no separate worker process is needed."""
+    print("Worker loop started.")
+    while True:
+        try:
+            job_id = await _claim_next_pending_job_id()
+            if not job_id:
+                await asyncio.sleep(WORKER_POLL_INTERVAL_S)
+                continue
+            print(f"Worker claimed job {job_id}")
+            job_row = await database.fetch_one(select(Job).where(Job.id == job_id))
+            settings = _extract_resolved_settings(job_row.settings if job_row else None)
+            await process_job_task(job_id, settings)
+        except asyncio.CancelledError:
+            print("Worker loop cancelled — shutting down.")
+            raise
+        except Exception as e:
+            print(f"Worker loop error: {e}")
+            await asyncio.sleep(WORKER_POLL_INTERVAL_S)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _ensure_schema()
     await database.connect()
-    yield
-    await database.disconnect()
+    worker_task = asyncio.create_task(_run_worker_loop())
+    try:
+        yield
+    finally:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        await database.disconnect()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -136,7 +202,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.PROCESSING, progress=0, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.PROCESSING, progress=0, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
 
@@ -145,16 +211,19 @@ async def process_job_task(job_id: str, settings: dict = None):
         os.makedirs(output_dir, exist_ok=True)
 
         await database.execute(
-            update(Job).where(Job.id == job_id).values(progress=10, updatedAt=datetime.utcnow())
+            update(Job).where(Job.id == job_id).values(progress=10, updatedAt=datetime.now(timezone.utc))
         )
 
-        # Run in thread
-        outputs, segments = await asyncio.to_thread(
-            run_mission_control_pipeline, asset.path, job_id, output_dir, settings
+        # Run in thread with timeout so hung jobs fail cleanly instead of blocking forever
+        outputs, segments = await asyncio.wait_for(
+            asyncio.to_thread(
+                run_mission_control_pipeline, asset.path, job_id, output_dir, settings
+            ),
+            timeout=JOB_TIMEOUT_S,
         )
 
         await database.execute(
-            update(Job).where(Job.id == job_id).values(progress=90, updatedAt=datetime.utcnow())
+            update(Job).where(Job.id == job_id).values(progress=90, updatedAt=datetime.now(timezone.utc))
         )
 
         # Insert Segments
@@ -182,11 +251,18 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.COMPLETED, progress=100, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.COMPLETED, progress=100, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
         print(f"Job {job_id} completed")
 
+    except asyncio.TimeoutError:
+        print(f"Job {job_id} timed out after {JOB_TIMEOUT_S}s")
+        await database.execute(
+            update(Job)
+            .where(Job.id == job_id)
+            .values(status=JobStatus.FAILED, progress=0, updatedAt=datetime.now(timezone.utc))
+        )
     except Exception as e:
         print(f"Job {job_id} failed: {e}")
         import traceback
@@ -195,7 +271,7 @@ async def process_job_task(job_id: str, settings: dict = None):
         query = (
             update(Job)
             .where(Job.id == job_id)
-            .values(status=JobStatus.FAILED, progress=0, updatedAt=datetime.utcnow())
+            .values(status=JobStatus.FAILED, progress=0, updatedAt=datetime.now(timezone.utc))
         )
         await database.execute(query)
 
@@ -253,8 +329,8 @@ async def create_preset(data: PresetCreate):
             description=data.description,
             overrides=json.dumps(data.overrides),
             schema_version=CURRENT_SCHEMA_VERSION,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
+            updatedAt=datetime.now(timezone.utc),
         )
         await database.execute(query)
     except IntegrityError:
@@ -293,7 +369,7 @@ async def update_preset(preset_id: str, data: PresetUpdate):
         raise HTTPException(status_code=404, detail="Preset not found")
 
     # Build update values
-    update_values = {"updatedAt": datetime.utcnow()}
+    update_values = {"updatedAt": datetime.now(timezone.utc)}
     if data.name is not None:
         update_values["name"] = data.name
     if data.description is not None:
@@ -379,8 +455,8 @@ async def import_preset(data: dict):
             description=description,
             overrides=json.dumps(overrides),
             schema_version=CURRENT_SCHEMA_VERSION,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
+            updatedAt=datetime.now(timezone.utc),
         )
         await database.execute(query)
     except IntegrityError:
@@ -430,7 +506,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Create Asset in DB
     query = insert(Asset).values(
-        id=asset_id, filename=file.filename, path=file_path, createdAt=datetime.utcnow()
+        id=asset_id, filename=file.filename, path=file_path, createdAt=datetime.now(timezone.utc)
     )
     await database.execute(query)
 
@@ -438,7 +514,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @app.post("/jobs")
-async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
+async def create_job(job_data: JobCreate):
     job_id = str(uuid.uuid4())
 
     # Verify asset exists
@@ -505,13 +581,10 @@ async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
         settings=settings_json,
         status=JobStatus.PENDING,
         progress=0,
-        createdAt=datetime.utcnow(),
-        updatedAt=datetime.utcnow(),
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
     )
     await database.execute(query)
-
-    # 6. Trigger Processing with resolved config
-    background_tasks.add_task(process_job_task, job_id, resolved_config)
 
     return {"id": job_id, "status": "PENDING"}
 
