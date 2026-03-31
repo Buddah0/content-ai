@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   api:
     build:
@@ -40,6 +38,7 @@ services:
       - "3000:3000"
     volumes:
       - .:/app
+      - next_cache:/app/web/.next
     depends_on:
       - api
 
@@ -47,3 +46,4 @@ volumes:
   uploads_data:
   outputs_data:
   db_data:
+  next_cache:

@@ -1,11 +1,12 @@
+import json
 import os
+import subprocess
 from typing import Any, Dict, List, Optional
 
-
+import imageio_ffmpeg
 import librosa
 import numpy as np
 from moviepy.editor import VideoFileClip
-
 
 
 def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -69,18 +70,13 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
         start_time = 0.0
         peak_rms = 0.0
 
-        # We need the clip object for flash detection if we want to use it
-        # But we closed it above. 
-        # Re-opening strictly for flash detection on candidate segments is better than holding it open?
-        # PREV CODE closed it. We can reopen if needed.
-        
         # Iterate through audio to find candidate segments
-        hop_length = 512 # Librosa default 
+
         # CAUTION: we need to know hop_length used in hpss/rms to map back to time
         # librosa.feature.rms uses hop_length=512 by default
-        
+
         events = []
-        
+
         for i, is_hype in enumerate(hype_mask):
             t = times[i]
             val = rms[i]
@@ -114,58 +110,39 @@ def detect_hype(video_path: str, config: Dict[str, Any]) -> List[Dict[str, Any]]
                 })
 
         # Refine events with Smart Lookback & Flash
-        # We need to reopen clip for flash detection
         try:
-             video_clip = VideoFileClip(video_path)
-             
              for ev in events:
                  # 1. Smart Lookback (Audio)
-                 # Find the index corresponding to event start
-                 # times array maps index -> time. 
-                 # We want index for ev["start"]
-                 # simple search or calc? index ~ time * sr / hop
-                 # But we have `times` array.
-                 # Let's find index where times >= start
                  start_idx = np.searchsorted(times, ev["start"])
-                 
+
                  smart_start_time = smart_lookback(
-                     rms, 
-                     start_idx, 
-                     sr=sr, 
-                     hop_length=512, 
+                     rms,
+                     start_idx,
+                     sr=sr,
+                     hop_length=512,
                      max_lookback_s=det_conf.get("event_lookback_s", 5.0)
                  )
-                 
+
                  # 2. Flash Detection (Video)
-                 # Search for flash in the window [smart_start_time, ev["start"]]
-                 # or even slightly before smart_start? 
-                 # Let's search from smart_start up to the event peak.
                  flash_time = detect_flash(
-                     video_clip, 
-                     smart_start_time, 
+                     video_path,
+                     smart_start_time,
                      ev["start"]
                  )
-                 
-                 # Decide final start
-                 # If flash found and is earlier/valid, use it?
+
                  if flash_time is not None:
-                     # If flash is within reasonable range of audio start
                      print(f"Flash detected at {flash_time:.2f}s (Audio start: {smart_start_time:.2f}s)")
-                     # Use the earlier of the two, but don't go back ridiculous amount?
-                     # Flash is usually THE start.
                      final_start = min(flash_time, smart_start_time)
                  else:
                      final_start = smart_start_time
-                 
+
                  raw_segments.append({
                      "start": float(final_start),
                      "end": float(ev["end"]),
                      "score": float(ev["peak"]),
                      "video_duration": duration,
                  })
-                 
-             video_clip.close()
-             
+
         except Exception as e:
             print(f"Error in refinement step: {e}")
             # Fallback to events as-is
@@ -206,31 +183,31 @@ def smart_lookback(
     """
     fps_audio = sr / hop_length
     max_lookback_frames = int(max_lookback_s * fps_audio)
-    
+
     # Define scan range
     scan_end = event_start_idx
     scan_start = max(0, scan_end - max_lookback_frames)
-    
+
     if scan_end <= scan_start:
         return 0.0
 
     # Extract the lookback window
     window = rms[scan_start:scan_end]
-    
+
     # Find the local minimum (valley) in this window
     # This represents the "quietest" point before the event
     valley_local_idx = np.argmin(window)
-    
+
     # Calculate global index and time
     final_idx = scan_start + valley_local_idx
-    
+
     # Safety: ensure we don't return a time AFTER the event start (impossible by def, but good to be sure)
     time_s = librosa.frames_to_time([final_idx], sr=sr, hop_length=hop_length)[0]
     return float(time_s)
 
 
 def detect_flash(
-    clip: VideoFileClip,
+    video_path: str,
     start_time: float,
     end_time: float,
     threshold_multiplier: float = 1.5,
@@ -238,27 +215,71 @@ def detect_flash(
     """
     Scans video frames in [start_time, end_time] for a sudden brightness flash.
     Returns timestamp of flash if found, else None.
+    Uses FFmpeg subprocess for fast frame extraction — does not load the full file.
     """
     try:
-        # Extract subclip to avoid processing entire video
-        # Safety clamp
-        if start_time < 0: start_time = 0
-        if float(end_time) > float(clip.duration): end_time = float(clip.duration)
-        if float(end_time) <= float(start_time): return None
+        if start_time < 0:
+            start_time = 0
+        if end_time <= start_time:
+            return None
 
-        # Sample at 10fps for speed
-        # We look for a localized spike in brightness
-        
-        # Generator of frames
-        times = []
+        # Get video dimensions via ffprobe (reads only container header, ~1s for any file size)
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        ffprobe_exe = ffmpeg_exe.replace("ffmpeg", "ffprobe")
+        if not os.path.exists(ffprobe_exe):
+            ffprobe_exe = "ffprobe"
+
+        probe_result = subprocess.run(
+            [
+                ffprobe_exe, "-v", "quiet", "-print_format", "json",
+                "-show_streams", "-select_streams", "v:0", video_path,
+            ],
+            capture_output=True, text=True, timeout=30,
+        )
+        probe_data = json.loads(probe_result.stdout)
+        video_streams = [s for s in probe_data.get("streams", []) if s.get("codec_type") == "video"]
+        if not video_streams:
+            return None
+        vs = video_streams[0]
+        width = int(vs["width"])
+        height = int(vs["height"])
+
+        # Extract raw RGB24 frames from the window only — fast seek, no full-file decode
+        frame_size = width * height * 3
+        proc = subprocess.Popen(
+            [
+                ffmpeg_exe,
+                "-ss", str(start_time),
+                "-t", str(end_time - start_time),
+                "-i", video_path,
+                "-vf", "fps=10",
+                "-f", "rawvideo",
+                "-pix_fmt", "rgb24",
+                "-an",
+                "-",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+
+        times_list = []
         brightness = []
-        
-        for t, frame in clip.subclip(start_time, end_time).iter_frames(fps=10, with_times=True, dtype="uint8"):
-            # Simple brightness: mean of RGB
-            # Frame is HxWx3
-            avg = np.mean(frame)
-            times.append(start_time + t) # t is relative to subclip start
+        frame_index = 0
+
+        while True:
+            chunk = proc.stdout.read(frame_size)
+            if len(chunk) < frame_size:
+                break
+            avg = float(np.mean(np.frombuffer(chunk, dtype=np.uint8)))
+            times_list.append(start_time + frame_index / 10.0)
             brightness.append(avg)
+            frame_index += 1
+
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            return None
 
         if not brightness:
             return None
@@ -266,14 +287,11 @@ def detect_flash(
         brightness = np.array(brightness)
         mean_b = np.mean(brightness)
         std_b = np.std(brightness)
-        
-        # Detect spike
-        # If max brightness is significantly higher than mean
-        max_idx = np.argmax(brightness)
+        max_idx = int(np.argmax(brightness))
         max_val = brightness[max_idx]
-        
-        if max_val > mean_b + (threshold_multiplier * std_b) and max_val > 50: # absolute floor
-             return float(times[max_idx])
+
+        if max_val > mean_b + (threshold_multiplier * std_b) and max_val > 50:
+            return float(times_list[max_idx])
 
         return None
 

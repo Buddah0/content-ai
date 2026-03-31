@@ -5,7 +5,12 @@ from typing import Any, Dict, List
 
 # Reuse existing modules
 from content_ai.detector import detect_hype
-from content_ai.renderer import build_montage_from_list, get_ffmpeg_cmd, render_segment_to_file, has_audio
+from content_ai.renderer import (
+    build_montage_from_list,
+    get_ffmpeg_cmd,
+    has_audio,
+    render_segment_to_file,
+)
 from content_ai.segments import merge_segments, pad_segments
 
 WATERMARK_PATH = os.path.join(os.getcwd(), "watermark.png")
@@ -74,7 +79,7 @@ def run_render_with_audio_check(cmd: List[str], source_path: str, output_path: s
     # Robustness check: did we lose audio?
     if has_audio(source_path) and not has_audio(output_path):
         print(f"WARNING: Audio lost in {output_path}. Retrying with AAC transcoding.")
-        
+
         # Replace -c:a copy with -c:a aac -b:a 192k
         new_cmd = []
         skip = False
@@ -82,13 +87,13 @@ def run_render_with_audio_check(cmd: List[str], source_path: str, output_path: s
             if skip:
                 skip = False
                 continue
-            
+
             if arg == "-c:a" and i + 1 < len(cmd) and cmd[i + 1] == "copy":
                 new_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
                 skip = True
             else:
                 new_cmd.append(arg)
-                
+
         print(f"Retry render (AAC): {shlex.join(new_cmd)}")
         try:
             subprocess.run(new_cmd, check=True)

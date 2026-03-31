@@ -1,7 +1,10 @@
 import re
 
-from datetime_guard_utils import build_offender_message, find_pattern_offenders, project_root_from_test
-
+from datetime_guard_utils import (
+    build_offender_message,
+    find_pattern_offenders,
+    project_root_from_test,
+)
 
 NAIVE_NOW_CALL_PATTERN = re.compile(r"datetime\.now\((?!\s*timezone\.utc\s*\))")
 NAIVE_DEFAULT_FACTORY_PATTERN = re.compile(r"default_factory\s*=\s*datetime\.now\b")

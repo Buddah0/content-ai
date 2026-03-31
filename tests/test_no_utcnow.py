@@ -1,4 +1,8 @@
-from datetime_guard_utils import build_offender_message, find_pattern_offenders, project_root_from_test
+from datetime_guard_utils import (
+    build_offender_message,
+    find_pattern_offenders,
+    project_root_from_test,
+)
 
 
 def test_no_datetime_utcnow_in_src():

@@ -113,7 +113,7 @@ export function resolveBaseline(
   for (const key of PRESET_KEYS) {
     const overrideVal = getByPath(overrides, key.backendPath);
     if (overrideVal !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (result as any)[key.uiKey] = overrideVal as number;
     }
   }

@@ -6,16 +6,20 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import create_engine, select, update
 
-from content_ai.api.db_models import Job, JobStatus
+from content_ai.api.db_models import Base, Job, JobStatus
 from content_ai.api.main import database, process_job_task
 
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./content_ai.db")
 WORKER_POLL_INTERVAL_S = float(os.getenv("WORKER_POLL_INTERVAL_S", "1.0"))
 
 
 @asynccontextmanager
 async def lifespan():
+    if DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(DATABASE_URL)
+        Base.metadata.create_all(engine)
     await database.connect()
     yield
     await database.disconnect()
